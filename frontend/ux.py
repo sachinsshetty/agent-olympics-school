@@ -111,5 +111,5 @@ with gr.Blocks(title="Tutor Challenge") as demo:
     submit_btn.click(submit_results, inputs=[student_sel, topic_sel, level_slider, set_type_dd], outputs=results_out)
 
 if __name__ == "__main__":
-    # Launching with theme in launch() as required by Gradio 6.x
-    demo.launch(server_port=7860, theme=gr.themes.Soft())
+    demo.launch(server_name="0.0.0.0", server_port=80,theme=gr.themes.Soft())  # css moved to launch()
+    
