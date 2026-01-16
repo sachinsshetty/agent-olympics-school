@@ -15,3 +15,13 @@ export SIM_API_BASE="https://actual-api-base-url"
 python gradio_tutor.py
 
 # 4. Open http://localhost:7860
+
+
+---
+
+
+docker build -t dwani/school-ux:latest -f Dockerfile .
+
+docker push dwani/school-ux:latest
+
+docker run -p 80:80 dwani/school-ux:latest

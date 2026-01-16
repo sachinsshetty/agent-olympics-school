@@ -3,7 +3,7 @@ import gradio as gr
 import requests
 
 BACKEND_URL = "http://localhost:8000"
-
+BACKEND_URL = "https://school-server.dwani.ai/"
 def get_students(set_type):
     try:
         resp = requests.get(f"{BACKEND_URL}/students", params={"set_type": set_type})
