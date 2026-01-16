@@ -4,9 +4,9 @@ Build AI tutors that infer student understanding through interaction and teach a
 
 ## The Task
 
-1. **Infer** – Chat with simulated K12 students to determine their understanding level (1-5)
-2. **Tutor** – Provide personalized teaching adapted to the student's understanding level and personality
-3. **Score** – Get evaluated on prediction accuracy (MSE) and tutoring quality (LLM judge)
+1. Infer – Chat with simulated K12 students to determine their understanding level (1-5)
+2. Tutor – Provide personalized teaching adapted to the student's understanding level and personality
+3. Score – Get evaluated on prediction accuracy (MSE) and tutoring quality (LLM judge)
 
 Understanding Levels
 
