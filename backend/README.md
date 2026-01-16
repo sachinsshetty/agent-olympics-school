@@ -5,7 +5,7 @@ school - ಶಾಲೆ
 --
 
 # 1. Set env vars
-export SIM_TEAM_API_KEY="your-team-key-here"
+export TUTOR_API_KEY="your-team-key-here"
 export SIM_API_BASE="https://actual-api-base-url"
 
 # 2. pip install fastapi uvicorn pydantic httpx python-dotenv
@@ -17,3 +17,6 @@ curl -X POST "http://localhost:8000/quick-chat" -H "Content-Type: application/js
 curl -X POST "http://localhost:8000/start" -d '{"settype": "dev"}'
 curl -X POST "http://localhost:8000/send" -d '{"conversation_id": "uuid", "message": "Hello!"}'
 
+
+docker build -t dwani/school-server:latest -f Dockerfile .
+docker compose -f compose.yml up -d
