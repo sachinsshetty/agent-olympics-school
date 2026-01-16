@@ -1,0 +1,3363 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Student Simulation API",
+    "description": "API for the Knowunity 'Understanding Student Knowledge Levels' hackathon challenge (Munich). Simulates K12 students (ages 14-18, German Gymnasium context) with hidden personas, ages, and skill levels (1-5) for tutoring agents to interact with. Participants infer skill levels through dialogue, then provide personalized tutoring.",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/students": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "List Students",
+        "description": "List available students.\n\nArgs:\n    set_type: Filter by student set - \"mini_dev\", \"dev\", \"eval\", or None for all\n\nNote: Persona details are not exposed to participants.\n\nReturns:\n    StudentListResponse with list of students (id, name, grade_level)",
+        "operationId": "list_students_students_get",
+        "parameters": [
+          {
+            "name": "set_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SetType"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Set Type"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/students/{student_id}/topics": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "Get Student Topics",
+        "description": "Get topics that a specific student has understanding levels for.\n\nParticipants should call this to discover which topics\nthey can test a given student on.\n\nArgs:\n    student_id: The student's ID\n\nReturns:\n    TopicListResponse with list of topics the student has understanding levels for",
+        "operationId": "get_student_topics_students__student_id__topics_get",
+        "parameters": [
+          {
+            "name": "student_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Student Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/subjects": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "List Subjects",
+        "description": "List all available subjects.\n\nReturns:\n    SubjectListResponse with list of subjects (id and name)",
+        "operationId": "list_subjects_subjects_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/topics": {
+      "get": {
+        "tags": [
+          "catalog"
+        ],
+        "summary": "List Topics",
+        "description": "List all available topics, optionally filtered by subject.\n\nArgs:\n    subject_id: Optional filter by subject ID\n\nReturns:\n    TopicListResponse with list of topics (id, subject_id, subject_name, name, grade_level)",
+        "operationId": "list_topics_topics_get",
+        "parameters": [
+          {
+            "name": "subject_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Subject Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/interact/start": {
+      "post": {
+        "tags": [
+          "interactions"
+        ],
+        "summary": "Start New Conversation",
+        "description": "Start a new conversation with a student on a topic.\n\nEach team has a limited number of conversations per student/topic combination:\n\n**Conversation Limits (per team/student/topic):**\n- mini_dev: Unlimited\n- dev: 10 conversations\n- eval: 3 conversations\n\nReturns a conversation_id to use for subsequent interactions.\n\nArgs:\n    request: The start session request with student_id and topic_id\n    team: Authenticated team (via X-Api-Key header)\n\nReturns:\n    StartConversationResponse with conversation_id and limits info\n\nRaises:\n    404: Student or topic not found\n    400: Invalid student-topic combination or conversation limit exceeded",
+        "operationId": "start_new_conversation_interact_start_post",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Team API key",
+              "title": "X-Api-Key"
+            },
+            "description": "Team API key"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartSessionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StartConversationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/interact": {
+      "post": {
+        "tags": [
+          "interactions"
+        ],
+        "summary": "Interact",
+        "description": "Send a tutor message and receive a student response within a conversation.\n\nYou must first start a conversation using POST /interact/start to get a\nconversation_id. Each conversation supports up to 10 turns.\n\nUse your turns to both assess the student's skill level and provide tutoring.\nThe session will be evaluated for:\n\n1. **Skill Level Prediction**: Submit predictions via POST /evaluate/mse\n2. **Tutoring Quality**: Evaluated via POST /evaluate/tutoring\n\n**Request Body:**\n- `conversation_id` (UUID, required): The conversation ID from POST /interact/start\n- `tutor_message` (string, required): Your tutoring message to the student\n\n**Headers:**\n- `X-Api-Key` (required): Your team's API key for authentication\n\nReturns:\n    InteractionResponse with the student's response and turn info\n\nRaises:\n    404: Conversation not found\n    403: Conversation does not belong to this team\n    429: Turn limit exceeded",
+        "operationId": "interact_interact_post",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Team API key",
+              "title": "X-Api-Key"
+            },
+            "description": "Team API key"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InteractionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InteractionResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluate/mse": {
+      "post": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Submit Predictions",
+        "description": "Submit understanding level predictions and receive MSE score.\n\nPredictions must cover ALL student-topic pairs in the specified set.\n\n**Submission Limits:**\n- mini_dev: Unlimited\n- dev: 100 submissions\n- eval: 3 submissions\n\nArgs:\n    submission: Batch of predictions with set_type\n    team: Authenticated team (via X-Api-Key header)\n\nReturns:\n    MSEResult with the calculated MSE and submission info\n\nRaises:\n    404: Student or topic in predictions not found\n    400: Invalid predictions (missing pairs, extra pairs, etc.)\n    429: Submission limit exceeded",
+        "operationId": "submit_predictions_evaluate_mse_post",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Team API key",
+              "title": "X-Api-Key"
+            },
+            "description": "Team API key"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PredictionSubmission"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MSEResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluate/tutoring": {
+      "post": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Evaluate Tutoring",
+        "description": "Evaluate tutoring quality for a student set.\n\nJudges the most recent conversation for each student-topic pair in the set\nand returns the average score. You must have at least one conversation per\nstudent-topic pair before evaluating.\n\n**Submission Limits:**\n- mini_dev: Unlimited\n- dev: 100 submissions\n- eval: 10 submissions\n\nArgs:\n    request: The set type to evaluate\n    team: Authenticated team (via X-Api-Key header)\n\nReturns:\n    TutoringEvaluationResult with average score across all conversations\n\nRaises:\n    400: Missing conversations for required pairs\n    429: Submission limit exceeded",
+        "operationId": "evaluate_tutoring_evaluate_tutoring_post",
+        "parameters": [
+          {
+            "name": "x-api-key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Team API key",
+              "title": "X-Api-Key"
+            },
+            "description": "Team API key"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TutoringEvaluationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TutoringEvaluationResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluate/leaderboard/inference": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Get Inference Leaderboard",
+        "description": "Get the inference leaderboard.\n\nRankings are based on lowest MSE score (lower is better).\nShows the best score for each team.\n\nArgs:\n    set_type: Which student set leaderboard to show (default: dev)\n\nReturns:\n    LeaderboardResponse with ranked entries",
+        "operationId": "get_inference_leaderboard_evaluate_leaderboard_inference_get",
+        "parameters": [
+          {
+            "name": "set_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SetType",
+              "default": "dev"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaderboardResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluate/leaderboard/tutoring": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Get Tutoring Leaderboard",
+        "description": "Get the tutoring leaderboard.\n\nRankings are based on highest average tutoring score (higher is better).\nShows the best score for each team.\n\nArgs:\n    set_type: Which student set leaderboard to show (default: dev)\n\nReturns:\n    LeaderboardResponse with ranked entries",
+        "operationId": "get_tutoring_leaderboard_evaluate_leaderboard_tutoring_get",
+        "parameters": [
+          {
+            "name": "set_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SetType",
+              "default": "dev"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaderboardResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/evaluate/leaderboard/combined": {
+      "get": {
+        "tags": [
+          "evaluation"
+        ],
+        "summary": "Get Combined Leaderboard",
+        "description": "Get the combined leaderboard.\n\nRankings are based on the average of each team's rank on the\ninference and tutoring leaderboards. Lower average rank is better.\n\nTeams must have submissions on BOTH leaderboards to appear here.\n\nArgs:\n    set_type: Which student set leaderboard to show (default: dev)\n\nReturns:\n    CombinedLeaderboardResponse with ranked entries including individual ranks",
+        "operationId": "get_combined_leaderboard_evaluate_leaderboard_combined_get",
+        "parameters": [
+          {
+            "name": "set_type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/SetType",
+              "default": "dev"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CombinedLeaderboardResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/teams": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Teams",
+        "description": "List all teams. Requires Supabase authentication.",
+        "operationId": "list_teams_admin_teams_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Create Team",
+        "description": "Create a new team. Returns the generated API key. Requires Supabase authentication.",
+        "operationId": "create_team_admin_teams_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/teams/{team_id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Team",
+        "description": "Get a specific team by ID. Requires Supabase authentication.",
+        "operationId": "get_team_admin_teams__team_id__get",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Update Team",
+        "description": "Update a team's name. Requires Supabase authentication.",
+        "operationId": "update_team_admin_teams__team_id__put",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TeamUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Delete Team",
+        "description": "Delete a team. Requires Supabase authentication.",
+        "operationId": "delete_team_admin_teams__team_id__delete",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Team Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/subjects": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Subjects Admin",
+        "description": "List all subjects (admin view). Requires Supabase authentication.",
+        "operationId": "list_subjects_admin_admin_subjects_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Create Subject",
+        "description": "Create a new subject. Requires Supabase authentication.",
+        "operationId": "create_subject_admin_subjects_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubjectCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/subjects/{subject_id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Subject",
+        "description": "Get a specific subject by ID. Requires Supabase authentication.",
+        "operationId": "get_subject_admin_subjects__subject_id__get",
+        "parameters": [
+          {
+            "name": "subject_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Subject Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Update Subject",
+        "description": "Update a subject's name. Requires Supabase authentication.",
+        "operationId": "update_subject_admin_subjects__subject_id__put",
+        "parameters": [
+          {
+            "name": "subject_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Subject Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SubjectUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubjectResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Delete Subject",
+        "description": "Delete a subject. Requires Supabase authentication.",
+        "operationId": "delete_subject_admin_subjects__subject_id__delete",
+        "parameters": [
+          {
+            "name": "subject_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Subject Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/topics": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Topics Admin",
+        "description": "List all topics (admin view), optionally filtered by subject. Requires Supabase authentication.",
+        "operationId": "list_topics_admin_admin_topics_get",
+        "parameters": [
+          {
+            "name": "subject_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Subject Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Create Topic",
+        "description": "Create a new topic under a subject. Requires Supabase authentication.",
+        "operationId": "create_topic_admin_topics_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopicCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/topics/{topic_id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Topic",
+        "description": "Get a specific topic by ID. Requires Supabase authentication.",
+        "operationId": "get_topic_admin_topics__topic_id__get",
+        "parameters": [
+          {
+            "name": "topic_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Topic Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Update Topic",
+        "description": "Update a topic's name and/or grade level. Requires Supabase authentication.",
+        "operationId": "update_topic_admin_topics__topic_id__put",
+        "parameters": [
+          {
+            "name": "topic_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Topic Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopicUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopicResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Delete Topic",
+        "description": "Delete a topic. Requires Supabase authentication.",
+        "operationId": "delete_topic_admin_topics__topic_id__delete",
+        "parameters": [
+          {
+            "name": "topic_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Topic Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/students": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Students Admin",
+        "description": "List all students with full details (admin only). Requires Supabase authentication.",
+        "operationId": "list_students_admin_admin_students_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentListFullResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Create Student",
+        "description": "Create a new student. Requires Supabase authentication.",
+        "operationId": "create_student_admin_students_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/students/{student_id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Student",
+        "description": "Get a specific student by ID with full details. Requires Supabase authentication.",
+        "operationId": "get_student_admin_students__student_id__get",
+        "parameters": [
+          {
+            "name": "student_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Student Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Update Student",
+        "description": "Update a student's details. Requires Supabase authentication.",
+        "operationId": "update_student_admin_students__student_id__put",
+        "parameters": [
+          {
+            "name": "student_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Student Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StudentUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StudentResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Delete Student",
+        "description": "Delete a student. Requires Supabase authentication.",
+        "operationId": "delete_student_admin_students__student_id__delete",
+        "parameters": [
+          {
+            "name": "student_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Student Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/understanding": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List All Understanding",
+        "description": "List all student understanding levels. Requires Supabase authentication.",
+        "operationId": "list_all_understanding_admin_understanding_get",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnderstandingListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Create Understanding",
+        "description": "Create a new understanding level entry. Requires Supabase authentication.",
+        "operationId": "create_understanding_admin_understanding_post",
+        "parameters": [
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnderstandingCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnderstandingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/students/{student_id}/understanding": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Student Understanding",
+        "description": "List all understanding levels for a specific student. Requires Supabase authentication.",
+        "operationId": "list_student_understanding_admin_students__student_id__understanding_get",
+        "parameters": [
+          {
+            "name": "student_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Student Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnderstandingListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/understanding/{student_id}/{topic_id}": {
+      "put": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Update Understanding",
+        "description": "Update an understanding level. Requires Supabase authentication.",
+        "operationId": "update_understanding_admin_understanding__student_id___topic_id__put",
+        "parameters": [
+          {
+            "name": "student_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Student Id"
+            }
+          },
+          {
+            "name": "topic_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Topic Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnderstandingUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnderstandingResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Delete Understanding",
+        "description": "Delete an understanding level entry. Requires Supabase authentication.",
+        "operationId": "delete_understanding_admin_understanding__student_id___topic_id__delete",
+        "parameters": [
+          {
+            "name": "student_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Student Id"
+            }
+          },
+          {
+            "name": "topic_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Topic Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/conversations": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Conversations",
+        "description": "List all conversations with optional filters.\n\nFilter by team, student, or topic to narrow down results.\nRequires Supabase authentication.",
+        "operationId": "list_conversations_admin_conversations_get",
+        "parameters": [
+          {
+            "name": "team_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Team Id"
+            }
+          },
+          {
+            "name": "student_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Student Id"
+            }
+          },
+          {
+            "name": "topic_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Topic Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationListResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/conversations/{conversation_id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Conversation",
+        "description": "Get full conversation detail including all messages.\n\nRequires Supabase authentication.",
+        "operationId": "get_conversation_admin_conversations__conversation_id__get",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Conversation Id"
+            }
+          },
+          {
+            "name": "authorization",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "Bearer token from Supabase auth",
+              "title": "Authorization"
+            },
+            "description": "Bearer token from Supabase auth"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Root",
+        "description": "Health check endpoint.",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Root  Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health Check",
+        "description": "Detailed health check endpoint.",
+        "operationId": "health_check_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Check Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CombinedLeaderboardEntry": {
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Team Id"
+          },
+          "team_name": {
+            "type": "string",
+            "title": "Team Name"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "inference_rank": {
+            "type": "integer",
+            "title": "Inference Rank"
+          },
+          "tutoring_rank": {
+            "type": "integer",
+            "title": "Tutoring Rank"
+          },
+          "submission_count": {
+            "type": "integer",
+            "title": "Submission Count"
+          },
+          "last_updated": {
+            "type": "string",
+            "title": "Last Updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "team_id",
+          "team_name",
+          "score",
+          "inference_rank",
+          "tutoring_rank",
+          "submission_count",
+          "last_updated"
+        ],
+        "title": "CombinedLeaderboardEntry",
+        "description": "A single entry in the combined leaderboard with rank details."
+      },
+      "CombinedLeaderboardResponse": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/CombinedLeaderboardEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entries",
+          "updated_at"
+        ],
+        "title": "CombinedLeaderboardResponse",
+        "description": "Response containing combined leaderboard data."
+      },
+      "ConversationDetail": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id"
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Team Id"
+          },
+          "team_name": {
+            "type": "string",
+            "title": "Team Name"
+          },
+          "student_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Student Id"
+          },
+          "topic_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Topic Id"
+          },
+          "topic_name": {
+            "type": "string",
+            "title": "Topic Name"
+          },
+          "subject_name": {
+            "type": "string",
+            "title": "Subject Name"
+          },
+          "messages": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationMessage"
+            },
+            "type": "array",
+            "title": "Messages"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "team_id",
+          "team_name",
+          "student_id",
+          "topic_id",
+          "topic_name",
+          "subject_name",
+          "messages",
+          "created_at"
+        ],
+        "title": "ConversationDetail",
+        "description": "Full conversation detail including all messages."
+      },
+      "ConversationListResponse": {
+        "properties": {
+          "conversations": {
+            "items": {
+              "$ref": "#/components/schemas/ConversationSummary"
+            },
+            "type": "array",
+            "title": "Conversations"
+          },
+          "total_count": {
+            "type": "integer",
+            "title": "Total Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversations",
+          "total_count"
+        ],
+        "title": "ConversationListResponse",
+        "description": "Response containing list of conversations."
+      },
+      "ConversationMessage": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          },
+          "turn_number": {
+            "type": "integer",
+            "title": "Turn Number"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "role",
+          "content",
+          "turn_number",
+          "created_at"
+        ],
+        "title": "ConversationMessage",
+        "description": "A single message in a conversation."
+      },
+      "ConversationSummary": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id"
+          },
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Team Id"
+          },
+          "team_name": {
+            "type": "string",
+            "title": "Team Name"
+          },
+          "student_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Student Id"
+          },
+          "topic_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Topic Id"
+          },
+          "topic_name": {
+            "type": "string",
+            "title": "Topic Name"
+          },
+          "subject_name": {
+            "type": "string",
+            "title": "Subject Name"
+          },
+          "message_count": {
+            "type": "integer",
+            "title": "Message Count"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          },
+          "last_message_at": {
+            "type": "string",
+            "title": "Last Message At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "team_id",
+          "team_name",
+          "student_id",
+          "topic_id",
+          "topic_name",
+          "subject_name",
+          "message_count",
+          "created_at",
+          "last_message_at"
+        ],
+        "title": "ConversationSummary",
+        "description": "Summary information about a conversation for listing."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InteractionRequest": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id",
+            "description": "The conversation ID obtained from POST /interact/start. Required for all interactions."
+          },
+          "tutor_message": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Tutor Message",
+            "description": "The tutor's message to send to the simulated student."
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "tutor_message"
+        ],
+        "title": "InteractionRequest",
+        "description": "Request to interact with a simulated student."
+      },
+      "InteractionResponse": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id"
+          },
+          "interaction_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Interaction Id"
+          },
+          "student_response": {
+            "type": "string",
+            "title": "Student Response"
+          },
+          "turn_number": {
+            "type": "integer",
+            "title": "Turn Number"
+          },
+          "is_complete": {
+            "type": "boolean",
+            "title": "Is Complete",
+            "description": "True if the maximum number of turns has been reached",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "interaction_id",
+          "student_response",
+          "turn_number"
+        ],
+        "title": "InteractionResponse",
+        "description": "Response from a simulated student interaction."
+      },
+      "LeaderboardEntry": {
+        "properties": {
+          "team_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Team Id"
+          },
+          "team_name": {
+            "type": "string",
+            "title": "Team Name"
+          },
+          "score": {
+            "type": "number",
+            "title": "Score"
+          },
+          "submission_count": {
+            "type": "integer",
+            "title": "Submission Count"
+          },
+          "last_updated": {
+            "type": "string",
+            "title": "Last Updated"
+          }
+        },
+        "type": "object",
+        "required": [
+          "team_id",
+          "team_name",
+          "score",
+          "submission_count",
+          "last_updated"
+        ],
+        "title": "LeaderboardEntry",
+        "description": "A single entry in the leaderboard."
+      },
+      "LeaderboardResponse": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/LeaderboardEntry"
+            },
+            "type": "array",
+            "title": "Entries"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "entries",
+          "updated_at"
+        ],
+        "title": "LeaderboardResponse",
+        "description": "Response containing leaderboard data."
+      },
+      "MSEResult": {
+        "properties": {
+          "mse_score": {
+            "type": "number",
+            "title": "Mse Score"
+          },
+          "num_predictions": {
+            "type": "integer",
+            "title": "Num Predictions"
+          },
+          "submission_number": {
+            "type": "integer",
+            "title": "Submission Number",
+            "description": "Current submission number for this set"
+          },
+          "submissions_remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submissions Remaining",
+            "description": "Remaining submissions for this set (None if unlimited)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mse_score",
+          "num_predictions",
+          "submission_number"
+        ],
+        "title": "MSEResult",
+        "description": "Result of MSE evaluation on predictions."
+      },
+      "PredictionSubmission": {
+        "properties": {
+          "predictions": {
+            "items": {
+              "$ref": "#/components/schemas/SinglePrediction"
+            },
+            "type": "array",
+            "title": "Predictions"
+          },
+          "set_type": {
+            "$ref": "#/components/schemas/SetType",
+            "description": "The student set to evaluate predictions against",
+            "default": "dev"
+          }
+        },
+        "type": "object",
+        "required": [
+          "predictions"
+        ],
+        "title": "PredictionSubmission",
+        "description": "A batch submission of understanding level predictions."
+      },
+      "SetType": {
+        "type": "string",
+        "enum": [
+          "mini_dev",
+          "dev",
+          "eval"
+        ],
+        "title": "SetType",
+        "description": "Type of student set for evaluation."
+      },
+      "SinglePrediction": {
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Student Id"
+          },
+          "topic_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Topic Id"
+          },
+          "predicted_level": {
+            "type": "number",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Predicted Level"
+          }
+        },
+        "type": "object",
+        "required": [
+          "student_id",
+          "topic_id",
+          "predicted_level"
+        ],
+        "title": "SinglePrediction",
+        "description": "A single prediction of a student's understanding level for a topic."
+      },
+      "StartConversationResponse": {
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Conversation Id"
+          },
+          "student_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Student Id"
+          },
+          "topic_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Topic Id"
+          },
+          "max_turns": {
+            "type": "integer",
+            "title": "Max Turns"
+          },
+          "conversations_remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conversations Remaining",
+            "description": "Remaining conversations for this team/student/topic (None if unlimited)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "conversation_id",
+          "student_id",
+          "topic_id",
+          "max_turns"
+        ],
+        "title": "StartConversationResponse",
+        "description": "Response when starting a new conversation."
+      },
+      "StartSessionRequest": {
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Student Id"
+          },
+          "topic_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Topic Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "student_id",
+          "topic_id"
+        ],
+        "title": "StartSessionRequest",
+        "description": "Request to start a new interaction session."
+      },
+      "StudentCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "short_description": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Short Description"
+          },
+          "persona_description": {
+            "type": "string",
+            "maxLength": 5000,
+            "minLength": 1,
+            "title": "Persona Description"
+          },
+          "age": {
+            "type": "integer",
+            "maximum": 20.0,
+            "minimum": 12.0,
+            "title": "Age"
+          },
+          "grade_level": {
+            "type": "integer",
+            "maximum": 13.0,
+            "minimum": 5.0,
+            "title": "Grade Level"
+          },
+          "set_type": {
+            "$ref": "#/components/schemas/SetType",
+            "default": "dev"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "short_description",
+          "persona_description",
+          "age",
+          "grade_level"
+        ],
+        "title": "StudentCreate",
+        "description": "Request to create a new student."
+      },
+      "StudentInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "grade_level": {
+            "type": "integer",
+            "title": "Grade Level"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "grade_level"
+        ],
+        "title": "StudentInfo",
+        "description": "Public student information (no persona details)."
+      },
+      "StudentListFullResponse": {
+        "properties": {
+          "students": {
+            "items": {
+              "$ref": "#/components/schemas/StudentResponse"
+            },
+            "type": "array",
+            "title": "Students"
+          }
+        },
+        "type": "object",
+        "required": [
+          "students"
+        ],
+        "title": "StudentListFullResponse",
+        "description": "Response containing full list of students for admin."
+      },
+      "StudentListResponse": {
+        "properties": {
+          "students": {
+            "items": {
+              "$ref": "#/components/schemas/StudentInfo"
+            },
+            "type": "array",
+            "title": "Students"
+          }
+        },
+        "type": "object",
+        "required": [
+          "students"
+        ],
+        "title": "StudentListResponse",
+        "description": "Response containing list of available students."
+      },
+      "StudentResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "short_description": {
+            "type": "string",
+            "title": "Short Description"
+          },
+          "persona_description": {
+            "type": "string",
+            "title": "Persona Description"
+          },
+          "age": {
+            "type": "integer",
+            "title": "Age"
+          },
+          "grade_level": {
+            "type": "integer",
+            "title": "Grade Level"
+          },
+          "set_type": {
+            "$ref": "#/components/schemas/SetType"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "short_description",
+          "persona_description",
+          "age",
+          "grade_level",
+          "set_type"
+        ],
+        "title": "StudentResponse",
+        "description": "Full student information for admin (includes persona)."
+      },
+      "StudentUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "short_description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Short Description"
+          },
+          "persona_description": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 5000,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Persona Description"
+          },
+          "age": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 20.0,
+                "minimum": 12.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Age"
+          },
+          "grade_level": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 13.0,
+                "minimum": 5.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grade Level"
+          },
+          "set_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SetType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "title": "StudentUpdate",
+        "description": "Request to update a student."
+      },
+      "SubjectCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "SubjectCreate",
+        "description": "Request to create a new subject."
+      },
+      "SubjectInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SubjectInfo",
+        "description": "Public subject information."
+      },
+      "SubjectListResponse": {
+        "properties": {
+          "subjects": {
+            "items": {
+              "$ref": "#/components/schemas/SubjectInfo"
+            },
+            "type": "array",
+            "title": "Subjects"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subjects"
+        ],
+        "title": "SubjectListResponse",
+        "description": "Response containing list of available subjects."
+      },
+      "SubjectResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SubjectResponse",
+        "description": "Full subject information for admin."
+      },
+      "SubjectUpdate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "SubjectUpdate",
+        "description": "Request to update a subject."
+      },
+      "TeamCreate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "TeamCreate",
+        "description": "Request to create a new team."
+      },
+      "TeamListResponse": {
+        "properties": {
+          "teams": {
+            "items": {
+              "$ref": "#/components/schemas/TeamResponse"
+            },
+            "type": "array",
+            "title": "Teams"
+          }
+        },
+        "type": "object",
+        "required": [
+          "teams"
+        ],
+        "title": "TeamListResponse",
+        "description": "Response containing list of teams."
+      },
+      "TeamResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "api_key": {
+            "type": "string",
+            "title": "Api Key"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "api_key",
+          "created_at"
+        ],
+        "title": "TeamResponse",
+        "description": "Full team information for admin."
+      },
+      "TeamUpdate": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "title": "TeamUpdate",
+        "description": "Request to update a team."
+      },
+      "TopicCreate": {
+        "properties": {
+          "subject_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Subject Id"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Name"
+          },
+          "grade_level": {
+            "type": "integer",
+            "maximum": 13.0,
+            "minimum": 5.0,
+            "title": "Grade Level"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject_id",
+          "name",
+          "grade_level"
+        ],
+        "title": "TopicCreate",
+        "description": "Request to create a new topic."
+      },
+      "TopicInfo": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "subject_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Subject Id"
+          },
+          "subject_name": {
+            "type": "string",
+            "title": "Subject Name"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "grade_level": {
+            "type": "integer",
+            "title": "Grade Level"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "subject_id",
+          "subject_name",
+          "name",
+          "grade_level"
+        ],
+        "title": "TopicInfo",
+        "description": "Public topic information with subject context."
+      },
+      "TopicListResponse": {
+        "properties": {
+          "topics": {
+            "items": {
+              "$ref": "#/components/schemas/TopicInfo"
+            },
+            "type": "array",
+            "title": "Topics"
+          }
+        },
+        "type": "object",
+        "required": [
+          "topics"
+        ],
+        "title": "TopicListResponse",
+        "description": "Response containing list of available topics."
+      },
+      "TopicResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "subject_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Subject Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "grade_level": {
+            "type": "integer",
+            "title": "Grade Level"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "subject_id",
+          "name",
+          "grade_level"
+        ],
+        "title": "TopicResponse",
+        "description": "Full topic information for admin."
+      },
+      "TopicUpdate": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "grade_level": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 13.0,
+                "minimum": 5.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grade Level"
+          }
+        },
+        "type": "object",
+        "title": "TopicUpdate",
+        "description": "Request to update a topic."
+      },
+      "TutoringEvaluationRequest": {
+        "properties": {
+          "set_type": {
+            "$ref": "#/components/schemas/SetType",
+            "description": "The student set to evaluate tutoring for",
+            "default": "dev"
+          }
+        },
+        "type": "object",
+        "title": "TutoringEvaluationRequest",
+        "description": "Request to evaluate tutoring quality for a student set."
+      },
+      "TutoringEvaluationResult": {
+        "properties": {
+          "score": {
+            "type": "number",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Score",
+            "description": "Average tutoring score across all conversations"
+          },
+          "num_conversations": {
+            "type": "integer",
+            "title": "Num Conversations",
+            "description": "Number of conversations evaluated"
+          },
+          "submission_number": {
+            "type": "integer",
+            "title": "Submission Number",
+            "description": "Current submission number for this set"
+          },
+          "submissions_remaining": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submissions Remaining",
+            "description": "Remaining tutoring evaluations for this set (None if unlimited)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "score",
+          "num_conversations",
+          "submission_number"
+        ],
+        "title": "TutoringEvaluationResult",
+        "description": "Result of tutoring evaluation for a student set."
+      },
+      "UnderstandingCreate": {
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Student Id"
+          },
+          "topic_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Topic Id"
+          },
+          "understanding_level": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Understanding Level"
+          }
+        },
+        "type": "object",
+        "required": [
+          "student_id",
+          "topic_id",
+          "understanding_level"
+        ],
+        "title": "UnderstandingCreate",
+        "description": "Request to create a new understanding level entry."
+      },
+      "UnderstandingListResponse": {
+        "properties": {
+          "understanding_levels": {
+            "items": {
+              "$ref": "#/components/schemas/UnderstandingResponse"
+            },
+            "type": "array",
+            "title": "Understanding Levels"
+          }
+        },
+        "type": "object",
+        "required": [
+          "understanding_levels"
+        ],
+        "title": "UnderstandingListResponse",
+        "description": "Response containing list of understanding levels."
+      },
+      "UnderstandingResponse": {
+        "properties": {
+          "student_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Student Id"
+          },
+          "topic_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Topic Id"
+          },
+          "understanding_level": {
+            "type": "integer",
+            "title": "Understanding Level"
+          }
+        },
+        "type": "object",
+        "required": [
+          "student_id",
+          "topic_id",
+          "understanding_level"
+        ],
+        "title": "UnderstandingResponse",
+        "description": "Full understanding level information for admin."
+      },
+      "UnderstandingUpdate": {
+        "properties": {
+          "understanding_level": {
+            "type": "integer",
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Understanding Level"
+          }
+        },
+        "type": "object",
+        "required": [
+          "understanding_level"
+        ],
+        "title": "UnderstandingUpdate",
+        "description": "Request to update an understanding level."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}
