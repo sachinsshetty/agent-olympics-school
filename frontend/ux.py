@@ -1,135 +1,97 @@
-#!/usr/bin/env python3
-"""
-Gradio UI → FastAPI → Student Simulator
-UPDATED: Correct set_type parameter
-"""
+# ui.py
+# Run with: python ui.py
 
 import gradio as gr
 import requests
-from typing import List
 
-FASTAPI_BASE = "http://localhost:8000"
+BACKEND_URL = "http://localhost:8000"
 
-def api_get(endpoint: str, params: dict = None) -> dict:
+def get_students(set_type):
     try:
-        url = f"{FASTAPI_BASE}{endpoint}"
-        print(f"→ GET {url}  params: {params}")  # debug
-        resp = requests.get(url, params=params, timeout=12)
-        print(f"← {resp.status_code} {resp.text[:180]}...")  # debug
+        resp = requests.get(f"{BACKEND_URL}/students", params={"set_type": set_type})
         resp.raise_for_status()
-        return resp.json()
+        data = resp.json()
+        # Extract list from the 'students' key in the response
+        student_list = data.get("students", [])
+        choices = [(f"{s['name']} (Grade {s.get('grade_level', s.get('gradelevel'))})", s["id"]) for s in student_list]
+        return gr.update(choices=choices), f"Found {len(choices)} students."
     except Exception as e:
-        return {"error": str(e)}
+        return gr.update(choices=[]), f"Error loading students: {str(e)}"
 
-def api_post(endpoint: str, payload: dict) -> dict:
+def get_topics(student_id):
+    if not student_id:
+        return gr.update(choices=[])
     try:
-        resp = requests.post(f"{FASTAPI_BASE}{endpoint}", json=payload, timeout=12)
+        resp = requests.get(f"{BACKEND_URL}/students/{student_id}/topics")
         resp.raise_for_status()
-        return resp.json()
-    except requests.exceptions.HTTPError as e:
-        return {"error": f"HTTP {e.response.status_code}: {e.response.text[:120]}"}
+        topic_list = resp.json().get("topics", [])
+        choices = [(t["name"], t["id"]) for t in topic_list]
+        return gr.update(choices=choices)
     except Exception as e:
-        return {"error": str(e)}
+        print(f"Error loading topics: {e}")
+        return gr.update(choices=[])
 
-def list_students(set_type: str = "dev") -> List[dict]:
-    data = api_get("/students", {"set_type": set_type})
-    if "error" in data:
-        return []
-    return data  # already list of StudentInfo dicts
+def handle_start(student_id, topic_id):
+    try:
+        resp = requests.post(f"{BACKEND_URL}/conversations/start", 
+                            json={"student_id": student_id, "topic_id": topic_id})
+        resp.raise_for_status()
+        data = resp.json()
+        return data["conversationid"], [], f"Chat started. ID: {data['conversationid']}"
+    except Exception as e:
+        return None, [], f"Failed to start: {str(e)}"
 
-def start_conversation(set_type: str = "dev") -> dict:
-    return api_post("/start", {"set_type": set_type})
-
-def send_message(conversation_id: str, message: str) -> dict:
-    return api_post("/send", {"conversation_id": conversation_id, "message": message})
-
-# ========================================
-# Gradio Logic
-# ========================================
-conversation_state = gr.State("")
-
-def auto_start(set_type):
-    students = list_students(set_type)
-    if not students:
-        return "", 0, "❌ No students available", [], ""
+def handle_chat(message, history, conv_id):
+    if not conv_id:
+        history.append((message, "⚠️ Please start a conversation first!"))
+        return "", history
     
-    conv = start_conversation(set_type)
-    if "error" in conv:
-        return "", 0, f"❌ {conv['error']}", [], ""
-    
-    status = f"✅ {conv['student_name']} - {conv['topic_name']} (Max: {conv['max_turns']})"
-    return conv["conversation_id"], conv["max_turns"], status, [], conv["conversation_id"]
+    try:
+        resp = requests.post(f"{BACKEND_URL}/conversations/{conv_id}/send", 
+                            json={"tutor_message": message})
+        resp.raise_for_status()
+        data = resp.json()
+        history.append((message, data["studentresponse"]))
+        return "", history
+    except Exception as e:
+        history.append((message, f"❌ Error: {str(e)}"))
+        return "", history
 
-def chat_step(message, history, conv_id):
-    if not conv_id or not message.strip():
-        return history, "Start conversation first", conv_id
-    
-    resp = send_message(conv_id, message)
-    if "error" in resp:
-        return history, f"❌ {resp['error']}", conv_id
-    
-    history.append([message, resp["student_response"]])
-    
-    status = f"Turn {resp['turn_number']}"
-    if resp.get("is_complete", False):
-        status += " — CONVERSATION COMPLETE ✓"
-    
-    return history, status, conv_id
-
-# ========================================
-# Gradio UI
-# ========================================
-with gr.Blocks(theme=gr.themes.Soft()) as demo:
-    gr.Markdown("# 🤖 AI Tutor - KnowUnity Agent Olympics 2026")
-    gr.Markdown("FastAPI (8000) ← Gradio (7860)")
+with gr.Blocks(title="AI Tutor Interface", theme=gr.themes.Soft()) as demo:
+    gr.Markdown("# 🧑‍🏫 AI Tutor Interaction Lab")
     
     with gr.Row():
-        with gr.Column(scale=1):
-            gr.Markdown("## 1. Start Session")
-            settype_dropdown = gr.Dropdown(
-                choices=["minidev", "dev", "eval"], 
-                value="dev", 
-                label="Student Set"
-            )
-            auto_btn = gr.Button("🚀 Auto Start", variant="primary")
-            
-            conv_id_display = gr.Textbox(label="Conversation ID", interactive=False)
-            max_turns = gr.Number(label="Max Turns", interactive=False)
-            status_txt = gr.Textbox(label="Status", lines=3)
-        
-        with gr.Column(scale=2):
-            gr.Markdown("## 2. Chat with Student")
-            chatbot = gr.Chatbot(height=500)
-            msg_input = gr.Textbox(placeholder="Type your message as the tutor...", label="Tutor Message")
-            with gr.Row():
-                send_btn = gr.Button("Send", variant="primary")
-                clear_btn = gr.Button("🗑️ Clear", scale=0)
-
-    # Hidden state
-    conv_state = gr.State("")
-
-    # Events
-    auto_btn.click(
-        auto_start,
-        inputs=settype_dropdown,
-        outputs=[conv_state, max_turns, status_txt, chatbot, conv_id_display]
-    )
+        set_type_input = gr.Dropdown(choices=["mini_dev", "dev", "eval"], value="mini_dev", label="Student Set")
+        load_btn = gr.Button("🔄 1. Load Students", variant="secondary")
     
-    send_btn.click(
-        chat_step,
-        inputs=[msg_input, chatbot, conv_state],
-        outputs=[chatbot, status_txt, conv_state]
-    )
-    msg_input.submit(
-        chat_step,
-        inputs=[msg_input, chatbot, conv_state],
-        outputs=[chatbot, status_txt, conv_state]
-    )
+    with gr.Row():
+        student_dropdown = gr.Dropdown(label="2. Select Student", choices=[])
+        topic_dropdown = gr.Dropdown(label="3. Select Topic", choices=[])
     
-    clear_btn.click(
-        lambda: ([], "", "", ""),
-        outputs=[chatbot, msg_input, status_txt, conv_state]
-    )
+    start_btn = gr.Button("🚀 4. Start Tutoring Session", variant="primary")
+    
+    chat_id_store = gr.State()
+    status_msg = gr.Markdown("Status: Ready")
+    
+    chatbot = gr.Chatbot(label="Tutoring Conversation", height=450)
+    msg_input = gr.Textbox(label="Your Message", placeholder="Ask a question to gauge understanding...")
+    send_btn = gr.Button("Send")
+
+    # Wire up events
+    load_btn.click(get_students, inputs=[set_type_input], outputs=[student_dropdown, status_msg])
+    student_dropdown.change(get_topics, inputs=[student_dropdown], outputs=[topic_dropdown])
+    
+    start_btn.click(handle_start, 
+                   inputs=[student_dropdown, topic_dropdown], 
+                   outputs=[chat_id_store, chatbot, status_msg])
+    
+    send_btn.click(handle_chat, 
+                  inputs=[msg_input, chatbot, chat_id_store], 
+                  outputs=[msg_input, chatbot])
+    
+    msg_input.submit(handle_chat, 
+                    inputs=[msg_input, chatbot, chat_id_store], 
+                    outputs=[msg_input, chatbot])
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=7860, share=False)
+    demo.launch(server_port=7860)
