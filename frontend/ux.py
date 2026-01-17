@@ -7,11 +7,11 @@ BACKEND_URL = "https://school-server.dwani.ai/"
 
 def random_start():
     try:
-        # 1. Randomly pick set_type (Internal only, not displayed)
+        # 1. Randomly pick set_type (Internal only)
         set_types = ["mini_dev", "dev", "eval"]
         selected_set = random.choice(set_types)
         
-        # 2. Fetch Students using the random set
+        # 2. Fetch Students
         s_resp = requests.get(f"{BACKEND_URL}/students", params={"set_type": selected_set}).json()
         students = s_resp.get("students", [])
         if not students: 
@@ -65,11 +65,10 @@ async def handle_chat(message, history, conv_id, topic_name):
 with gr.Blocks() as demo:
     gr.Markdown("# 🧑‍🏫 AI Tutor")
     
-    # Information Display Row (No set_type display)
+    # Information Display Row
     with gr.Row():
         student_display = gr.Textbox(label="Student", interactive=False, scale=2)
         topic_display = gr.Textbox(label="Topic", interactive=False, scale=2)
-        # Button to cycle to next random student
         load_btn = gr.Button("🎲 Next Random", scale=1)
 
     # State Variables
@@ -81,7 +80,12 @@ with gr.Blocks() as demo:
         with gr.Column(scale=3):
             chatbot = gr.Chatbot(height=450)
             with gr.Row():
-                msg_input = gr.Textbox(label="Message", scale=5)
+                # Added placeholder text here
+                msg_input = gr.Textbox(
+                    label="Message", 
+                    placeholder="Enter your question to start...", 
+                    scale=5
+                )
                 submit_btn = gr.Button("Submit", variant="primary", scale=1)
         with gr.Column(scale=1):
             level_out = gr.Number(label="Level", value=3)
@@ -91,16 +95,11 @@ with gr.Blocks() as demo:
 
     # --- Event Wiring ---
     
-    # Outputs for the random starter (removed set_display)
     start_outputs = [student_display, topic_display, chat_id, topic_name_state, chatbot, status_out]
 
-    # Auto-start on load
     demo.load(random_start, inputs=None, outputs=start_outputs)
-    
-    # Click to shuffle
     load_btn.click(random_start, inputs=None, outputs=start_outputs)
 
-    # Chat interaction
     chat_args = {
         "fn": handle_chat,
         "inputs": [msg_input, chatbot, chat_id, topic_name_state],
