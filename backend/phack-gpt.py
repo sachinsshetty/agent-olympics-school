@@ -86,7 +86,7 @@ async def perform_interaction(conv_id, tutor_msg, topic_name, history):
     try:
         a_prompt = ANALYSIS_PROMPT.format(history_text=history_text, topic_name=topic_name)
         a_res = await openai_client.chat.completions.create(
-            model="gpt-5-nano", 
+            model="gpt-4.1-nano-2025-04-14", 
             messages=[{"role": "user", "content": a_prompt}],
             response_format={"type": "json_object"}
         )
@@ -99,7 +99,7 @@ async def perform_interaction(conv_id, tutor_msg, topic_name, history):
         level = analysis.get("understanding_level", 3)
         s_prompt = TUTORING_PROMPT.format(level=level, topic_name=topic_name, last_response=student_reply)
         s_res = await openai_client.chat.completions.create(
-            model="gpt-5-nano", 
+            model="gpt-4.1-nano-2025-04-14", 
             messages=[{"role": "user", "content": s_prompt}],
             response_format={"type": "json_object"}
         )
@@ -114,6 +114,61 @@ async def perform_interaction(conv_id, tutor_msg, topic_name, history):
         "analysis": analysis, 
         "suggestion": suggestion
     }
+
+@app.post("/submit_simulation")
+async def submit_simulation(set_type: str = Query("mini_dev")):
+    """
+    Fetches completed simulation results and submits them 
+    to the Knowunity MSE evaluation endpoint.
+    """
+    # 1. Retrieve the results from internal storage
+    simulation = simulation_storage.get(set_type)
+    
+    if not simulation:
+        raise HTTPException(status_code=404, detail=f"No simulation found for set: {set_type}")
+    
+    if simulation.get("status") != "completed":
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Simulation is still {simulation.get('status')}. Please wait for completion."
+        )
+
+    # 2. Format the payload for the Knowunity API
+    # Maps internal keys to 'predicted_level' as required by the evaluation endpoint
+    predictions = [
+        {
+            "student_id": entry["student_id"],
+            "topic_id": entry["topic_id"],
+            "predicted_level": entry["inferred_level"]
+        }
+        for entry in simulation.get("data", [])
+    ]
+
+    payload = {
+        "predictions": predictions,
+        "set_type": set_type
+    }
+
+    # 3. Call the Knowunity /evaluate/mse endpoint
+    try:
+        eval_resp = requests.post(
+            f"{API_BASE}/evaluate/mse",
+            json=payload,
+            headers=HEADERS
+        )
+        
+        if eval_resp.status_code != 200:
+            return {
+                "error": "Knowunity evaluation failed",
+                "details": eval_resp.text,
+                "status_code": eval_resp.status_code
+            }
+
+        return eval_resp.json()
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to submit to Knowunity: {str(e)}")
+
 
 # --- Background Task & Simulation ---
 async def run_simulation(set_type: str, pairs: List[dict]):
