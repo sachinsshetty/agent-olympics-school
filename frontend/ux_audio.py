@@ -3,10 +3,10 @@ import requests
 import random
 import os
 import logging
-import dwani  # Import the dwani library
+import dwani
+import tempfile  # Required for saving TTS audio
 
 # --- Configuration ---
-# API Configuration
 BACKEND_URL = "https://school-server.dwani.ai/"
 dwani.api_key = os.getenv("DWANI_API_KEY")
 dwani.api_base = os.getenv("DWANI_API_BASE_URL")
@@ -16,10 +16,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 if not dwani.api_key:
-    logger.warning("⚠️ DWANI_API_KEY not set. Transcription features will fail.")
+    logger.warning("⚠️ DWANI_API_KEY not set. Transcription/TTS features will fail.")
 
-# Language Options (from your provided code)
+# Language Options
 ASR_LANGUAGES = ["english", "german"]
+
+# Mapping for TTS languages if they differ slightly, or reuse ASR list
+TTS_LANGUAGES = ASR_LANGUAGES 
 
 # --- Helper Functions ---
 
@@ -66,35 +69,47 @@ def random_start():
         return "Error", "Error", None, "", [], f"Error: {str(e)}"
 
 def transcribe_with_dwani(audio_path, language):
-    """
-    Real implementation using dwani.ASR.transcribe
-    """
-    if not audio_path:
-        return ""
-    
-    if not dwani.api_key:
-        return "Error: DWANI_API_KEY not found in environment variables."
+    if not audio_path: return ""
+    if not dwani.api_key: return "Error: DWANI_API_KEY missing."
 
     try:
         logger.info(f"Transcribing {audio_path} in {language}...")
-        # Call the Dwani API
         result = dwani.ASR.transcribe(file_path=audio_path, language=language)
-        
-        # Handle the response format (dictionary vs string)
         if isinstance(result, dict):
-            # Attempt to find text in common keys, or dump the whole dict if unsure
             return result.get("text") or result.get("transcription") or str(result)
         return str(result)
-        
     except Exception as e:
         logger.error(f"ASR Error: {e}")
         return f"Error: {str(e)}"
 
+def speak_response(text, language):
+    """
+    Converts text to speech using Dwani API and returns the file path.
+    """
+    if not text: return None
+    if not dwani.api_key: return None
+
+    try:
+        logger.info(f"Synthesizing speech for: {text[:30]}... in {language}")
+        response = dwani.Audio.speech(
+            input=text,
+            response_format="mp3",
+            language=language
+        )
+        # Save to temp file
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_file:
+            temp_file.write(response)
+            return temp_file.name
+    except Exception as e:
+        logger.error(f"TTS Error: {e}")
+        return None
+
 # --- Interaction Handlers ---
 
-async def handle_chat(message, history, conv_id, topic_name):
+async def handle_chat_logic(message, history, conv_id, topic_name):
+    """Shared logic for calling the backend"""
     if not conv_id: 
-        return "", history, "No Session", 3, "", ""
+        return history, "No Session", 3, "", "", "" # Return empty response text
         
     hist_state = history if history is not None else []
     
@@ -107,40 +122,47 @@ async def handle_chat(message, history, conv_id, topic_name):
     
     try:
         resp = requests.post(f"{BACKEND_URL}/conversations/interact", json=payload).json()
+        student_response = resp.get("student_response", "...")
         
-        # Gradio 6.3 compliant "messages" format
         new_history = list(hist_state) + [
             {"role": "user", "content": message}, 
-            {"role": "assistant", "content": resp.get("student_response", "...")}
+            {"role": "assistant", "content": student_response}
         ]
         
         return (
-            "", # Clear input 
             new_history, 
             f"Turn {resp.get('turn_number', '?')}/10", 
             resp.get("analysis", {}).get("understanding_level", 3), 
             resp.get("analysis", {}).get("justification", ""), 
-            resp.get("suggestion", {}).get("suggested_response", "")
+            resp.get("suggestion", {}).get("suggested_response", ""),
+            student_response # Return the raw text for TTS
         )
     except Exception as e:
-        return message, hist_state, f"Error: {str(e)}", 0, "", ""
+        return hist_state, f"Error: {str(e)}", 0, "", "", ""
+
+async def handle_text_chat(message, history, conv_id, topic_name):
+    """Wrapper for text-only input"""
+    new_hist, status, level, justif, sugg, _ = await handle_chat_logic(message, history, conv_id, topic_name)
+    return "", new_hist, status, level, justif, sugg
 
 async def handle_voice_chat(audio_path, language, history, conv_id, topic_name):
+    """Wrapper for voice input + TTS output"""
     if not audio_path:
-        return None, history, "❌ No Audio Recorded", 0, "", ""
+        return None, history, "❌ No Audio", 0, "", "", None
         
-    # 1. Transcribe using Dwani
+    # 1. Transcribe
     transcribed_text = transcribe_with_dwani(audio_path, language)
-    
-    # Check if transcription looks like an error message or is empty
     if not transcribed_text or transcribed_text.startswith("Error"):
-        return None, history, f"❌ {transcribed_text}", 0, "", ""
+        return None, history, f"❌ {transcribed_text}", 0, "", "", None
 
-    # 2. Feed transcription into existing chat logic
-    _, new_hist, status, level, justif, sugg = await handle_chat(transcribed_text, history, conv_id, topic_name)
+    # 2. Get Backend Response
+    new_hist, status, level, justif, sugg, raw_response = await handle_chat_logic(transcribed_text, history, conv_id, topic_name)
     
-    return None, new_hist, status, level, justif, sugg
-
+    # 3. Synthesize Speech (TTS)
+    # We use the same language for TTS as was used for ASR, assuming the conversation stays in that language.
+    audio_response_path = speak_response(raw_response, language)
+    
+    return None, new_hist, status, level, justif, sugg, audio_response_path
 
 # --- UI Setup ---
 
@@ -183,15 +205,18 @@ with gr.Blocks(title="AI Tutor - ಶಾಲೆ") as demo:
                 # Tab 2: Voice
                 with gr.TabItem("🎤 Voice Chat"):
                     with gr.Row():
-                        audio_input = gr.Audio(sources=["microphone"], type="filepath", label="Record Response")
+                        audio_input = gr.Audio(sources=["microphone"], type="filepath", label="Record Input")
                     with gr.Row():
                         asr_lang_dropdown = gr.Dropdown(
-                            label="Spoken Language", 
+                            label="Language (ASR & TTS)", 
                             choices=ASR_LANGUAGES, 
                             value="english",
                             interactive=True
                         )
-                        voice_submit_btn = gr.Button("Transcribe & Send", variant="primary")
+                        voice_submit_btn = gr.Button("Transcribe & Speak", variant="primary")
+                    
+                    # Output for TTS
+                    tts_output = gr.Audio(label="AI Response Audio", interactive=False, autoplay=True)
 
         # RIGHT: Analysis Panel
         with gr.Column(scale=1):
@@ -211,12 +236,12 @@ with gr.Blocks(title="AI Tutor - ಶಾಲೆ") as demo:
     chat_inputs = [msg_input, chatbot, chat_id, topic_name_state]
     chat_outputs = [msg_input, chatbot, status_out, level_out, analysis_out, suggest_out]
     
-    msg_input.submit(fn=handle_chat, inputs=chat_inputs, outputs=chat_outputs)
-    submit_btn.click(fn=handle_chat, inputs=chat_inputs, outputs=chat_outputs)
+    msg_input.submit(fn=handle_text_chat, inputs=chat_inputs, outputs=chat_outputs)
+    submit_btn.click(fn=handle_text_chat, inputs=chat_inputs, outputs=chat_outputs)
 
-    # 3. Voice Handler (Includes Language Dropdown)
+    # 3. Voice Handler (Outputs to tts_output as well)
     voice_inputs = [audio_input, asr_lang_dropdown, chatbot, chat_id, topic_name_state]
-    voice_outputs = [audio_input, chatbot, status_out, level_out, analysis_out, suggest_out]
+    voice_outputs = [audio_input, chatbot, status_out, level_out, analysis_out, suggest_out, tts_output]
     
     voice_submit_btn.click(fn=handle_voice_chat, inputs=voice_inputs, outputs=voice_outputs)
 
