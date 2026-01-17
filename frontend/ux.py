@@ -56,14 +56,14 @@ async def handle_chat(message, history, conv_id, topic_name):
     return "", new_history, f"Turn {resp.get('turn_number', '?')}/10", resp.get("analysis", {}).get("understanding_level", 3), resp.get("analysis", {}).get("justification", ""), resp.get("suggestion", {}).get("suggested_response", "")
 
 
-# 1. Define the Favicon HTML (Uses the 🧑‍🏫 emoji as an icon)
+# 1. Define the Favicon HTML
 favicon_html = """
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧑‍🏫</text></svg>">
 """
 
-# 2. Inject it into the 'head' parameter
-with gr.Blocks(title="AI Tutor Dashboard", head=favicon_html) as demo:
-    gr.Markdown("# 🧑‍🏫 AI Tutor")
+# 2. Set Title in Blocks (Standard way)
+with gr.Blocks(title="AI Tutor - ಶಾಲೆ") as demo:
+    gr.Markdown("# 🧑‍🏫 AI Tutor - ಶಾಲೆ")
     
     with gr.Row():
         student_display = gr.Textbox(label="Student", interactive=False, scale=2)
@@ -104,5 +104,11 @@ with gr.Blocks(title="AI Tutor Dashboard", head=favicon_html) as demo:
 
 
 if __name__ == "__main__":
-    # Removed favicon_path since we are using head injection
-    demo.launch(server_name="0.0.0.0", server_port=8080, theme=gr.themes.Soft())
+    # 3. Pass 'head' to launch (Newer Gradio requirement)
+    # Removed 'page_title' to fix TypeError
+    demo.launch(
+        server_name="0.0.0.0", 
+        server_port=8080, 
+        theme=gr.themes.Soft(),
+        head=favicon_html
+    )
