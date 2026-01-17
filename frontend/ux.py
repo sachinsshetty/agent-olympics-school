@@ -1,98 +1,114 @@
-# ux.py
 import gradio as gr
 import requests
+import random
 
 BACKEND_URL = "http://localhost:8000"
 BACKEND_URL = "https://school-server.dwani.ai/"
 
-def get_students(set_type):
+def random_start():
     try:
-        resp = requests.get(f"{BACKEND_URL}/students", params={"set_type": set_type})
-        data = resp.json()
-        students = data.get("students", [])
-        choices = [(f"{s['name']} (G{s.get('grade_level', '?')})", s["id"]) for s in students]
-        return gr.update(choices=choices), f"✅ Loaded {len(choices)} students"
+        set_types = ["mini_dev", "dev", "eval"]
+        selected_set = random.choice(set_types)
+        
+        s_resp = requests.get(f"{BACKEND_URL}/students", params={"set_type": selected_set}).json()
+        students = s_resp.get("students", [])
+        if not students: 
+            return "❌ Error", "❌ Error", None, "", [], "No students found"
+        
+        student = random.choice(students)
+        student_text = f"{student['name']} (Grade {student.get('grade_level', '?')})"
+        
+        t_resp = requests.get(f"{BACKEND_URL}/students/{student['id']}/topics").json()
+        topics = t_resp.get("topics", [])
+        if not topics:
+            return student_text, "❌ No Topics", None, "", [], "No topics found"
+            
+        topic = random.choice(topics)
+        topic_text = topic["name"]
+        
+        payload = {
+            "student_id": student['id'], 
+            "topic_id": topic['id'],
+            "set_type": selected_set
+        }
+        start_resp = requests.post(f"{BACKEND_URL}/conversations/start", json=payload).json()
+        conv_id = start_resp.get("conversation_id")
+        
+        status_msg = f"🚀 Ready ({selected_set})"
+        
+        return (
+            student_text, 
+            topic_text,    
+            conv_id,       
+            topic['name'], 
+            [],            
+            status_msg     
+        )
     except Exception as e:
-        return gr.update(choices=[]), f"❌ Error: {str(e)}"
-
-def get_topics(student_id):
-    if not student_id: return gr.update(choices=[])
-    try:
-        resp = requests.get(f"{BACKEND_URL}/students/{student_id}/topics")
-        topics = resp.json().get("topics", [])
-        return gr.update(choices=[(t["name"], t["id"]) for t in topics])
-    except: return gr.update(choices=[])
-
-def handle_start(student_id, topic_id):
-    try:
-        payload = {"student_id": student_id, "topic_id": topic_id}
-        resp = requests.post(f"{BACKEND_URL}/conversations/start", json=payload)
-        data = resp.json()
-        return data["conversation_id"], [], f"🚀 Session Started: {data['conversation_id']}"
-    except Exception as e:
-        return None, [], f"❌ Start failed: {str(e)}"
+        return "Error", "Error", None, "", [], f"Error: {str(e)}"
 
 async def handle_chat(message, history, conv_id, topic_name):
-    if not conv_id:
-        history.append({"role": "assistant", "content": "⚠️ Start a session first!"})
-        return "", history, "Error", 3, "Start a session first."
+    if not conv_id: return "", history, "No Session", 3, "", ""
+    hist_state = history if history is not None else []
+    payload = {"conversation_id": conv_id, "tutor_message": message, "topic_name": str(topic_name or "Topic"), "history": hist_state}
+    resp = requests.post(f"{BACKEND_URL}/conversations/interact", json=payload).json()
+    new_history = list(hist_state) + [{"role": "user", "content": message}, {"role": "assistant", "content": resp.get("student_response", "...")}]
+    return "", new_history, f"Turn {resp.get('turn_number', '?')}/10", resp.get("analysis", {}).get("understanding_level", 3), resp.get("analysis", {}).get("justification", ""), resp.get("suggestion", {}).get("suggested_response", "")
+
+
+# 1. Define the Favicon HTML
+favicon_html = """
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧑‍🏫</text></svg>">
+"""
+
+# 2. Set Title in Blocks (Standard way)
+with gr.Blocks(title="AI Tutor - ಶಾಲೆ") as demo:
+    gr.Markdown("# 🧑‍🏫 AI Tutor - ಶಾಲೆ")
     
-    try:
-        payload = {"conversation_id": conv_id, "tutor_message": message, "topic_name": topic_name, "history": history}
-        resp = requests.post(f"{BACKEND_URL}/conversations/interact", json=payload).json()
-        
-        history.append({"role": "user", "content": message})
-        history.append({"role": "assistant", "content": resp.get("student_response")})
-        
-        analysis = resp.get("analysis", {})
-        status = f"Turn {resp.get('turn_number')}/10 | Complete: {resp.get('is_complete')}"
-        return "", history, status, analysis.get("understanding_level", 3), analysis.get("justification", "")
-    except Exception as e:
-        history.append({"role": "assistant", "content": f"❌ Error: {str(e)}"})
-        return "", history, "Error", 3, f"Failed: {str(e)}"
-
-def submit_results(student_id, topic_id, level, set_type):
-    try:
-        mse_payload = {"predictions": [{"student_id": student_id, "topic_id": topic_id, "predicted_level": float(level)}], "set_type": set_type}
-        mse_resp = requests.post(f"{BACKEND_URL}/evaluate/mse", json=mse_payload).json()
-        tut_resp = requests.post(f"{BACKEND_URL}/evaluate/tutoring", params={"set_type": set_type}).json()
-        return f"🏆 MSE SCORE: {mse_resp.get('mse_score', 'N/A')}\n\n📖 TUTORING SCORE: {tut_resp.get('score', 'N/A')}"
-    except Exception as e:
-        return f"Submission Error: {str(e)}"
-
-with gr.Blocks(title="AI Tutor Lab") as demo:
-    gr.Markdown("# 🧑‍🏫 AI Tutor Lab: In-Server Analysis")
     with gr.Row():
-        set_type_dd = gr.Dropdown(["mini_dev", "dev", "eval"], value="mini_dev", label="Set")
-        load_btn = gr.Button("🔄 Load Students")
-    with gr.Row():
-        student_sel = gr.Dropdown(label="Student", choices=[])
-        topic_sel = gr.Dropdown(label="Topic", choices=[])
-    start_btn = gr.Button("🚀 Start Session", variant="primary")
+        student_display = gr.Textbox(label="Student", interactive=False, scale=2)
+        topic_display = gr.Textbox(label="Topic", interactive=False, scale=2)
+        load_btn = gr.Button("🎲 Next Random", scale=1)
+
     chat_id = gr.State()
-    status_msg = gr.Markdown("Status: Ready")
+    topic_name_state = gr.State("")
+
     with gr.Row():
         with gr.Column(scale=3):
-            chatbot = gr.Chatbot(label="Conversation", height=450)
-            msg_input = gr.Textbox(label="Message")
-            send_btn = gr.Button("Send")
+            chatbot = gr.Chatbot(height=450)
+            with gr.Row():
+                msg_input = gr.Textbox(
+                    label="Message", 
+                    placeholder="Enter your question to start...", 
+                    scale=5
+                )
+                submit_btn = gr.Button("Submit", variant="primary", scale=1)
         with gr.Column(scale=1):
-            gr.Markdown("### 📊 Live Inference")
-            inferred_level = gr.Number(label="Inferred Level (1-5)", value=3)
-            analysis_box = gr.Markdown("Waiting for interaction...")
-    with gr.Accordion("Leaderboard Submission", open=False):
-        level_slider = gr.Slider(1, 5, step=1, label="Predicted Level")
-        submit_btn = gr.Button("Submit Results")
-        results_out = gr.Code(label="Final Leaderboard Metrics")
+            level_out = gr.Number(label="Level", value=3)
+            analysis_out = gr.Markdown("Analysis...")
+            suggest_out = gr.Textbox(label="Suggestion", lines=6)
+            status_out = gr.Markdown("Ready")
 
-    topic_name_state = gr.State("")
-    load_btn.click(get_students, inputs=set_type_dd, outputs=[student_sel, status_msg])
-    student_sel.change(get_topics, inputs=student_sel, outputs=topic_sel)
-    topic_sel.change(lambda t: t, inputs=topic_sel, outputs=topic_name_state)
-    start_btn.click(handle_start, inputs=[student_sel, topic_sel], outputs=[chat_id, chatbot, status_msg])
-    send_btn.click(handle_chat, inputs=[msg_input, chatbot, chat_id, topic_name_state], outputs=[msg_input, chatbot, status_msg, inferred_level, analysis_box])
-    msg_input.submit(handle_chat, inputs=[msg_input, chatbot, chat_id, topic_name_state], outputs=[msg_input, chatbot, status_msg, inferred_level, analysis_box])
-    submit_btn.click(submit_results, inputs=[student_sel, topic_sel, level_slider, set_type_dd], outputs=results_out)
+    start_outputs = [student_display, topic_display, chat_id, topic_name_state, chatbot, status_out]
+
+    demo.load(random_start, inputs=None, outputs=start_outputs)
+    load_btn.click(random_start, inputs=None, outputs=start_outputs)
+
+    chat_args = {
+        "fn": handle_chat,
+        "inputs": [msg_input, chatbot, chat_id, topic_name_state],
+        "outputs": [msg_input, chatbot, status_out, level_out, analysis_out, suggest_out]
+    }
+    msg_input.submit(**chat_args)
+    submit_btn.click(**chat_args)
+
 
 if __name__ == "__main__":
-    demo.launch(server_name="0.0.0.0", server_port=8080, theme=gr.themes.Soft())
+    # 3. Pass 'head' to launch (Newer Gradio requirement)
+    # Removed 'page_title' to fix TypeError
+    demo.launch(
+        server_name="0.0.0.0", 
+        server_port=8080, 
+        theme=gr.themes.Soft(),
+        head=favicon_html
+    )

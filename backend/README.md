@@ -30,3 +30,10 @@ docker build -t dwani/school-server:latest -f Dockerfile .
 
 docker compose -f compose.yml up -d
 ```
+
+--
+
+- server API : https://knowunity-agent-olympics-2026-api.vercel.app
+
+- Leaderboard Submit
+    - uvicorn phack:app --reload
