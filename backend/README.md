@@ -1,19 +1,32 @@
-school - ಶಾಲೆ
-
-- Agent Olympic Hackathon : Munich 2026
+school - ಶಾಲೆ - Server
 
 --
 
-# 1. Set env vars
-export SIM_TEAM_API_KEY="your-team-key-here"
-export SIM_API_BASE="https://actual-api-base-url"
+1. Set env vars
+```bash
+export TUTOR_API_KEY="your-team-key-here"
+export TUTOR_API_BASE_URL="https://actual-api-base-url"
+export DWANI_API_BASE_URL="https://actual-api-base-url"
+```
+2. Install libraries : python3.10
+```bash
+python3.10 -m venv venv
+source venv/bin/activate
 
-# 2. pip install fastapi uvicorn pydantic httpx python-dotenv
+pip install --upgrade pip setuptools wheel
+pip install --no-deps   torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
-# 3. uvicorn main:app --reload
+pip install -r requirements.txt
+```
 
-# 4. Test endpoints:
-curl -X POST "http://localhost:8000/quick-chat" -H "Content-Type: application/json"
-curl -X POST "http://localhost:8000/start" -d '{"settype": "dev"}'
-curl -X POST "http://localhost:8000/send" -d '{"conversation_id": "uuid", "message": "Hello!"}'
+3. Run the server
+```bash
+uvicorn main:app --reload
+```
 
+- Docker Steps
+```bash
+docker build -t dwani/school-server:latest -f Dockerfile .
+
+docker compose -f compose.yml up -d
+```
