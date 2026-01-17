@@ -60,10 +60,10 @@ class StartRequest(BaseModel):
 @app.post("/generate_mse")
 async def generate_mse(set_type: str = Query("mini_dev")):
     """
-    Collects all student-topic pairs by correctly accessing 
-    the 'students' and 'topics' keys in the API response.
+    Fetches data from Knowunity and uses the local start_conversation 
+    endpoint logic to initialize sessions.
     """
-    # 1. Fetch student list
+    # 1. Fetch students from Knowunity
     students_resp = requests.get(
         f"{API_BASE}/students", 
         params={"set_type": set_type}, 
@@ -72,33 +72,44 @@ async def generate_mse(set_type: str = Query("mini_dev")):
     if students_resp.status_code != 200:
         raise HTTPException(status_code=students_resp.status_code, detail="Failed to fetch students")
     
-    # Access the list using the "students" key
     students_data = students_resp.json().get("students", [])
     all_pairs = []
 
-    # 2. Iterate through each student object
+    # 2. Iterate through students
     for student in students_data:
         student_id = student.get("id")
         student_name = student.get("name")
         
-        # 3. Fetch topics for this student
+        # 3. Fetch topics from Knowunity
         topics_resp = requests.get(
             f"{API_BASE}/students/{student_id}/topics", 
             headers=HEADERS
         )
         
         if topics_resp.status_code == 200:
-            # Access the list using the "topics" key
             topics_data = topics_resp.json().get("topics", [])
             
             for topic in topics_data:
-                all_pairs.append({
-                    "student_id": student_id,
-                    "student_name": student_name,
-                    "topic_id": topic.get("id"),
-                    "topic_name": topic.get("name"),
-                    "subject_name": topic.get("subject_name")
-                })
+                topic_id = topic.get("id")
+                
+                # 4. Call your OWN internal endpoint logic
+                # We wrap the IDs in the StartRequest Pydantic model your endpoint expects
+                try:
+                    start_req = StartRequest(student_id=student_id, topic_id=topic_id)
+                    conv_data = start_conversation(start_req)
+                    
+                    all_pairs.append({
+                        "student_id": student_id,
+                        "student_name": student_name,
+                        "topic_id": topic_id,
+                        "topic_name": topic.get("name"),
+                        "conversation_id": conv_data.get("conversation_id"),
+                        "max_turns": conv_data.get("max_turns"),
+                        "subject_name": topic.get("subject_name")
+                    })
+                except Exception as e:
+                    # Log or skip pairs that fail to initialize
+                    continue
 
     return {
         "set_type": set_type,
