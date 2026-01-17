@@ -67,7 +67,8 @@ def get_student_topics(student_id: str):
 
 @app.post("/conversations/start")
 def start_conversation(req: StartRequest):
-    return requests.post(f"{API_BASE}/interact/start", json=req.dict(), headers=HEADERS).json()
+    # UPDATED: Use model_dump() instead of dict() for Pydantic V2 compatibility
+    return requests.post(f"{API_BASE}/interact/start", json=req.model_dump(), headers=HEADERS).json()
 
 @app.post("/conversations/interact")
 async def interact(request: Request):
