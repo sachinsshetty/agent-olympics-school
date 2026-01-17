@@ -6,6 +6,7 @@ services:
       - "80:8000"  # Expose FastAPI server port (adjust if needed)
     environment:
       - TUTOR_API_KEY=YourKey
+      - DWANI_API_BASE_URL="API_URL"
     networks:
       - app-network
     extra_hosts:
