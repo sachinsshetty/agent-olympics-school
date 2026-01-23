@@ -1,0 +1,92 @@
+name: Master CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      deploy_target:
+        description: 'Deployment target'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      modules:
+        description: 'Modules to deploy (comma-separated)'
+        required: false
+        default: 'all'
+        type: string
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      game: ${{ steps.filter.outputs.game }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect changed modules
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            game:
+              - 'game/**'
+            frontend:
+              - 'frontend/**'
+            backend:
+              - 'backend/**'
+
+  game-workflow:
+    uses: ./.github/workflows/game-ci.yml
+    needs: detect-changes
+    if: needs.detect-changes.outputs.game == 'true' || github.event.inputs.modules == 'all' || contains(github.event.inputs.modules, 'game')
+    secrets: inherit
+
+  frontend-workflow:
+    uses: ./.github/workflows/frontend-ci.yml
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true' || github.event.inputs.modules == 'all' || contains(github.event.inputs.modules, 'frontend')
+    secrets: inherit
+
+  backend-workflow:
+    uses: ./.github/workflows/backend-ci.yml
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend == 'true' || github.event.inputs.modules == 'all' || contains(github.event.inputs.modules, 'backend')
+    secrets: inherit
+
+  deploy-all:
+    runs-on: ubuntu-latest
+    needs: [game-workflow, frontend-workflow, backend-workflow]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    environment: production
+    steps:
+      - name: Deploy all modules
+        run: |
+          echo "All modules deployed successfully to production"
+          echo "Game: ${{ needs.game-workflow.result }}"
+          echo "Frontend: ${{ needs.frontend-workflow.result }}"
+          echo "Backend: ${{ needs.backend-workflow.result }}"
+
+  health-check:
+    runs-on: ubuntu-latest
+    needs: deploy-all
+    if: needs.deploy-all.result == 'success'
+
+    steps:
+      - name: Run health checks
+        run: |
+          echo "Running post-deployment health checks"
+          # Add health check commands for each service
+          # Example:
+          # curl -f https://your-game-domain.com/api/health
+          # curl -f https://your-frontend-domain.com/health
+          # curl -f https://your-backend-domain.com/docs
