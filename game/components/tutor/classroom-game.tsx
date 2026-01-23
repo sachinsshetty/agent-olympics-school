@@ -6,9 +6,18 @@ import { OrbitControls, Environment, Html, Text, RoundedBox } from "@react-three
 import * as THREE from "three"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer"
 import { CollaborativeLearning } from "./collaborative-learning"
 import { AIAssistance } from "./ai-assistance"
 import { GamificationSystem } from "./gamification-system"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 // Types
 interface Player {
@@ -505,6 +514,7 @@ export function ClassroomGame() {
   const [selectedPlayer, setSelectedPlayer] = useState<string | null>(null)
   const [ejectedPlayer, setEjectedPlayer] = useState<Player | null>(null)
   const [showEjectionAnim, setShowEjectionAnim] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false)
 
   const [players, setPlayers] = useState<Player[]>([
     {
@@ -774,61 +784,153 @@ export function ClassroomGame() {
           {/* Left HUD (stable stack) */}
           <div className="col-span-12 sm:col-span-5 lg:col-span-3 flex flex-col gap-3 pointer-events-auto">
             {/* Question counter */}
-            <div className="bg-card/90 backdrop-blur border border-border rounded-lg p-3">
-              <div className="text-xs text-muted-foreground mb-1">Question</div>
-              <div className="text-2xl font-bold text-foreground">
-                {currentQuestionIndex + 1}
-                <span className="text-muted-foreground text-lg">/10</span>
-              </div>
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="bg-card/90 backdrop-blur border border-border rounded-lg p-3 cursor-help">
+                  <div className="text-xs text-muted-foreground mb-1">Question</div>
+                  <div className="text-2xl font-bold text-foreground">
+                    {currentQuestionIndex + 1}
+                    <span className="text-muted-foreground text-lg">/10</span>
+                  </div>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Current question number out of 10 total questions</p>
+              </TooltipContent>
+            </Tooltip>
 
             {/* Timer */}
             {gameState === "answering" && (
-              <div className="bg-card/90 backdrop-blur border border-border rounded-lg p-3">
-                <div className="text-xs text-muted-foreground mb-1 text-center">Time</div>
-                <div
-                  className={cn(
-                    "text-3xl font-mono font-bold text-center",
-                    timeLeft <= 5 ? "text-destructive animate-pulse" : "text-primary"
-                  )}
-                >
-                  {timeLeft}
-                </div>
-              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="bg-card/90 backdrop-blur border border-border rounded-lg p-3 cursor-help">
+                    <div className="text-xs text-muted-foreground mb-1 text-center">Time</div>
+                    <div
+                      className={cn(
+                        "text-3xl font-mono font-bold text-center",
+                        timeLeft <= 5 ? "text-destructive animate-pulse" : "text-primary"
+                      )}
+                    >
+                      {timeLeft}
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Time remaining to answer. Answer quickly to earn bonus points!</p>
+                </TooltipContent>
+              </Tooltip>
             )}
 
             {/* Players status */}
-            <div className="bg-card/90 backdrop-blur border border-border rounded-lg p-3">
-              <div className="text-xs text-muted-foreground mb-2">Players</div>
-              <div className="space-y-2">
-                {players
-                  .filter((p) => p.role === "student")
-                  .map((player) => (
-                    <div
-                      key={player.id}
-                      className={cn(
-                        "flex items-center gap-2 text-sm",
-                        player.status === "ejected" && "opacity-40 line-through"
-                      )}
-                    >
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: player.color }} />
-                      <span className="font-medium">{player.name}</span>
-                      <span className="text-muted-foreground ml-auto tabular-nums">{player.score}</span>
-                      <div className="flex gap-0.5">
-                        {Array.from({ length: 3 }).map((_, i) => (
-                          <div
-                            key={i}
-                            className={cn(
-                              "w-2 h-2 rounded-full",
-                              i < player.strikes ? "bg-destructive" : "bg-muted"
-                            )}
-                          />
-                        ))}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="bg-card/90 backdrop-blur border border-border rounded-lg p-3 cursor-help">
+                  <div className="text-xs text-muted-foreground mb-2">Players</div>
+                  <div className="space-y-2">
+                    {players
+                      .filter((p) => p.role === "student")
+                      .map((player) => (
+                        <div
+                          key={player.id}
+                          className={cn(
+                            "flex items-center gap-2 text-sm",
+                            player.status === "ejected" && "opacity-40 line-through"
+                          )}
+                        >
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: player.color }} />
+                          <span className="font-medium">{player.name}</span>
+                          <span className="text-muted-foreground ml-auto tabular-nums">{player.score}</span>
+                          <div className="flex gap-0.5">
+                            {Array.from({ length: 3 }).map((_, i) => (
+                              <div
+                                key={i}
+                                className={cn(
+                                  "w-2 h-2 rounded-full",
+                                  i < player.strikes ? "bg-destructive" : "bg-muted"
+                                )}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Player status: Score and strikes (3 strikes = ejection)</p>
+              </TooltipContent>
+            </Tooltip>
+
+            {/* Mobile tools drawer trigger */}
+            {gameState === "answering" && (
+              <div className="lg:hidden">
+                <Drawer open={toolsOpen} onOpenChange={setToolsOpen}>
+                  <DrawerTrigger asChild>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          type="button"
+                          className="w-full bg-gradient-to-r from-green-500 to-teal-500 text-white hover:from-green-600 hover:to-teal-600"
+                        >
+                          Tools (AI • Team • Rewards)
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Open learning tools: AI assistance, collaboration, and achievements</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </DrawerTrigger>
+                  <DrawerContent className="max-h-[85vh]">
+                    <DrawerHeader>
+                      <DrawerTitle>Learning Tools</DrawerTitle>
+                      <DrawerDescription>
+                        Use collaboration, AI hints, and rewards without cluttering the game.
+                      </DrawerDescription>
+                    </DrawerHeader>
+
+                    <div className="px-4 pb-4 space-y-3 overflow-y-auto">
+                      <div className="bg-card/90 border border-border rounded-lg p-3">
+                        <CollaborativeLearning
+                          players={players}
+                          currentQuestion={currentQuestion}
+                          onContribution={(type, content) => {
+                            console.log(`Collaboration: ${type} - ${content}`)
+                          }}
+                          onHelpRequest={(playerId) => {
+                            console.log(`Help requested from: ${playerId}`)
+                          }}
+                        />
                       </div>
+
+                      <div className="bg-card/90 border border-border rounded-lg p-3">
+                        <AIAssistance
+                          currentQuestion={currentQuestion}
+                          playerProgress={{ level: 2, correct: 3, total: 5 }}
+                          gameState={gameState}
+                          onAIHelp={(type, content) => {
+                            console.log(`AI Help: ${type} - ${content}`)
+                          }}
+                        />
+                      </div>
+
+                      <div className="bg-card/90 border border-border rounded-lg p-3">
+                        <GamificationSystem
+                          player={players.find((p) => p.id === "student-1")}
+                          gameStats={{ correct: 3, total: 5, streak: 2 }}
+                          onAchievementUnlock={(achievement) => {
+                            console.log(`Achievement unlocked: ${achievement.name}`)
+                          }}
+                        />
+                      </div>
+
+                      <Button type="button" variant="outline" className="w-full" onClick={() => setToolsOpen(false)}>
+                        Close
+                      </Button>
                     </div>
-                  ))}
+                  </DrawerContent>
+                </Drawer>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Right HUD (learning tools) */}
@@ -927,9 +1029,16 @@ export function ClassroomGame() {
                 ))}
             </div>
 
-            <Button onClick={startGame} size="lg" className="w-full">
-              Start Game
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button onClick={startGame} size="lg" className="w-full">
+                  Start Game
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Begin the educational quiz game. Answer questions correctly to avoid ejection!</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
       )}
@@ -968,9 +1077,16 @@ export function ClassroomGame() {
                   )
                 })}
             </div>
-            <Button onClick={nextQuestion} size="lg" className="w-full">
-              Next Question
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button onClick={nextQuestion} size="lg" className="w-full">
+                  Next Question
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>Continue to the next question in the quiz</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
         </div>
       )}

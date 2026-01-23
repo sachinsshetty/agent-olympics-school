@@ -8,6 +8,7 @@ import { Classroom3D } from "@/components/tutor/classroom-3d-wrapper"
 import { ClassroomGame } from "@/components/tutor/classroom-game-wrapper"
 import { AITutorChatbot } from "@/components/tutor/ai-tutor-chatbot"
 import { cn } from "@/lib/utils"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 type ViewMode = "split" | "realtime" | "classroom-3d" | "game-mode" | "teacher" | "student-1" | "student-2" | "chatbot" | "educational-games"
 
@@ -45,132 +46,195 @@ export default function FactorioTutor() {
 
         {/* View Toggle */}
         <div className="flex items-center gap-1 p-1 rounded-lg bg-secondary">
-          <button
-            type="button"
-            onClick={() => setViewMode("split")}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
-              viewMode === "split"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            Split View
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("realtime")}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
-              viewMode === "realtime"
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
-            Realtime 2D
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("classroom-3d")}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
-              viewMode === "classroom-3d"
-                ? "bg-primary text-primary-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 3L2 9l10 6 10-6-10-6z" />
-              <path d="M2 17l10 6 10-6" />
-              <path d="M2 13l10 6 10-6" />
-            </svg>
-            3D Class
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("game-mode")}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
-              viewMode === "game-mode"
-                ? "bg-destructive text-destructive-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14.5 4h-5L7 7H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2h-3l-2.5-3z" />
-              <circle cx="12" cy="13" r="3" />
-            </svg>
-            Game Mode
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("teacher")}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
-              viewMode === "teacher"
-                ? "bg-node-teacher text-background"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            Teacher
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("student-1")}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
-              viewMode === "student-1"
-                ? "bg-node-student-1 text-background"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            Alex
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("student-2")}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
-              viewMode === "student-2"
-                ? "bg-node-student-2 text-background"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            Jordan
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("chatbot")}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
-              viewMode === "chatbot"
-                ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-            Chatbot
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("educational-games")}
-            className={cn(
-              "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
-              viewMode === "educational-games"
-                ? "bg-gradient-to-r from-green-500 to-teal-500 text-white"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
-            Learn Game
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setViewMode("split")}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                  viewMode === "split"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Split View
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>View teacher and students side by side</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setViewMode("realtime")}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
+                  viewMode === "realtime"
+                    ? "bg-accent text-accent-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+                Realtime 2D
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Interactive 2D knowledge flow map with live connections</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setViewMode("classroom-3d")}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
+                  viewMode === "classroom-3d"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 3L2 9l10 6 10-6-10-6z" />
+                  <path d="M2 17l10 6 10-6" />
+                  <path d="M2 13l10 6 10-6" />
+                </svg>
+                3D Class
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Immersive 3D classroom visualization</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setViewMode("game-mode")}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
+                  viewMode === "game-mode"
+                    ? "bg-destructive text-destructive-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M14.5 4h-5L7 7H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2h-3l-2.5-3z" />
+                  <circle cx="12" cy="13" r="3" />
+                </svg>
+                Game Mode
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Classic game mode view</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setViewMode("teacher")}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                  viewMode === "teacher"
+                    ? "bg-node-teacher text-background"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Teacher
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>View teacher dashboard and controls</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setViewMode("student-1")}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                  viewMode === "student-1"
+                    ? "bg-node-student-1 text-background"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Alex
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>View Alex's learning progress and activities</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setViewMode("student-2")}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-md transition-colors",
+                  viewMode === "student-2"
+                    ? "bg-node-student-2 text-background"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                Jordan
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>View Jordan's learning progress and activities</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setViewMode("chatbot")}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
+                  viewMode === "chatbot"
+                    ? "bg-gradient-to-r from-purple-500 to-pink-500 text-white"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                Chatbot
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>AI-powered tutoring chatbot with real student interactions</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setViewMode("educational-games")}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
+                  viewMode === "educational-games"
+                    ? "bg-gradient-to-r from-green-500 to-teal-500 text-white"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                  <path d="M2 17l10 5 10-5" />
+                  <path d="M2 12l10 5 10-5" />
+                </svg>
+                Learn Game
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Among Us-style educational game with collaborative learning</p>
+            </TooltipContent>
+          </Tooltip>
         </div>
       </header>
 

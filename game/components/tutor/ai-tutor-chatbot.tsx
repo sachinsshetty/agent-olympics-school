@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 const BACKEND_URL = "https://school-server.dwani.ai/"
 
@@ -197,13 +198,20 @@ export function AITutorChatbot() {
           <h2 className="text-xl font-bold text-foreground">🧑‍🏫 AI Tutor Chatbot</h2>
           <p className="text-sm text-muted-foreground">Interactive tutoring sessions with real students</p>
         </div>
-        <Button
-          onClick={startRandomSession}
-          disabled={isLoading}
-          className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
-        >
-          🎲 New Session
-        </Button>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              onClick={startRandomSession}
+              disabled={isLoading}
+              className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
+            >
+              🎲 New Session
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Start a new tutoring session with a random student and topic</p>
+          </TooltipContent>
+        </Tooltip>
       </div>
 
       {/* Student and Topic Info */}
@@ -291,15 +299,22 @@ export function AITutorChatbot() {
                   disabled={isLoading || !conversationId}
                   className="flex-1 min-h-[60px] resize-none"
                 />
-                <Button
-                  onClick={sendMessage}
-                  disabled={isLoading || !input.trim() || !conversationId}
-                  className="self-end"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      onClick={sendMessage}
+                      disabled={isLoading || !input.trim() || !conversationId}
+                      className="self-end"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                      </svg>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Send your tutoring message (or press Enter)</p>
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </CardContent>
           </Card>
