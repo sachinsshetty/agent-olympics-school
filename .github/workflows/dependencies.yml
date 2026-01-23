@@ -1,0 +1,131 @@
+name: Dependencies
+
+on:
+  schedule:
+    # Run weekly on Mondays at 9 AM UTC
+    - cron: '0 9 * * 1'
+  workflow_dispatch:
+
+jobs:
+  update-game-deps:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./game
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Update dependencies
+        run: |
+          npm update
+          npm audit fix || true
+
+      - name: Run tests after update
+        run: npm run build
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update game dependencies"
+          title: "Update Game Dependencies"
+          body: |
+            This PR updates the dependencies for the game module.
+
+            - Updated Node.js dependencies
+            - Ran security audit fixes
+            - Verified build still works
+
+            Please review and test before merging.
+          branch: dependencies/game-updates
+          delete-branch: true
+
+  update-frontend-deps:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Update dependencies
+        run: |
+          pip install --upgrade pip
+          pip install --upgrade -r requirements.txt
+          pip list --outdated || true
+
+      - name: Run basic checks
+        run: |
+          python -c "import gradio; import fastapi; print('Imports still work')"
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update frontend dependencies"
+          title: "Update Frontend Dependencies"
+          body: |
+            This PR updates the dependencies for the frontend module.
+
+            - Updated Python dependencies
+            - Verified basic imports still work
+
+            Please review and test before merging.
+          branch: dependencies/frontend-updates
+          delete-branch: true
+
+  update-backend-deps:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Update dependencies
+        run: |
+          pip install --upgrade pip
+          pip install --upgrade -r requirements.txt
+          pip list --outdated || true
+
+      - name: Run basic checks
+        run: |
+          python -c "from main import app; print('FastAPI app still works')"
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update backend dependencies"
+          title: "Update Backend Dependencies"
+          body: |
+            This PR updates the dependencies for the backend module.
+
+            - Updated Python dependencies
+            - Verified FastAPI app still works
+
+            Please review and test before merging.
+          branch: dependencies/backend-updates
+          delete-branch: true
