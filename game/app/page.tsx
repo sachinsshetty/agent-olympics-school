@@ -9,7 +9,7 @@ import { ClassroomGame } from "@/components/tutor/classroom-game-wrapper"
 import { AITutorChatbot } from "@/components/tutor/ai-tutor-chatbot"
 import { cn } from "@/lib/utils"
 
-type ViewMode = "split" | "realtime" | "classroom-3d" | "game-mode" | "teacher" | "student-1" | "student-2" | "chatbot"
+type ViewMode = "split" | "realtime" | "classroom-3d" | "game-mode" | "teacher" | "student-1" | "student-2" | "chatbot" | "educational-games"
 
 export default function FactorioTutor() {
   const [viewMode, setViewMode] = useState<ViewMode>("split")
@@ -154,6 +154,23 @@ export default function FactorioTutor() {
             </svg>
             Chatbot
           </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("educational-games")}
+            className={cn(
+              "px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center gap-1.5",
+              viewMode === "educational-games"
+                ? "bg-gradient-to-r from-green-500 to-teal-500 text-white"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 2L2 7l10 5 10-5-10-5z" />
+              <path d="M2 17l10 5 10-5" />
+              <path d="M2 12l10 5 10-5" />
+            </svg>
+            Learn Game
+          </button>
         </div>
       </header>
 
@@ -197,6 +214,10 @@ export default function FactorioTutor() {
         ) : viewMode === "chatbot" ? (
           <div className="h-full max-w-6xl mx-auto">
             <AITutorChatbot />
+          </div>
+        ) : viewMode === "educational-games" ? (
+          <div className="h-full">
+            <ClassroomGame />
           </div>
         ) : (
           <div className="h-full max-w-2xl mx-auto">

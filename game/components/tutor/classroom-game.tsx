@@ -6,18 +6,27 @@ import { OrbitControls, Environment, Html, Text, RoundedBox } from "@react-three
 import * as THREE from "three"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { CollaborativeLearning } from "./collaborative-learning"
+import { AIAssistance } from "./ai-assistance"
+import { GamificationSystem } from "./gamification-system"
 
 // Types
 interface Player {
   id: string
   name: string
-  role: "teacher" | "student"
+  role: "teacher" | "student" | "mentor" | "learner"
   color: string
   position: [number, number, number]
   status: "alive" | "ejected" | "winner"
   score: number
   strikes: number
   currentAnswer?: string
+  level: number
+  badges: string[]
+  streak: number
+  collaborationScore: number
+  isHelping: boolean
+  helpedBy: string[]
 }
 
 interface Question {
@@ -26,23 +35,91 @@ interface Question {
   options: string[]
   correctAnswer: number
   topic: string
+  difficulty: "easy" | "medium" | "hard"
+  hints: string[]
+  explanation: string
+  collaborative?: boolean
+  timeLimit?: number
+  points: number
 }
 
-// Quiz questions
+interface GameMode {
+  id: string
+  name: string
+  description: string
+  rules: string[]
+  maxPlayers: number
+  timeLimit: number
+  objectives: string[]
+}
+
+// Game Modes
+const GAME_MODES: GameMode[] = [
+  {
+    id: "classic",
+    name: "Classic Quiz",
+    description: "Traditional Among Us-style quiz with elimination",
+    rules: ["Answer questions correctly", "3 wrong answers = elimination", "Last player standing wins"],
+    maxPlayers: 8,
+    timeLimit: 600,
+    objectives: ["Answer correctly", "Help teammates", "Avoid elimination"]
+  },
+  {
+    id: "mentorship",
+    name: "Mentorship Mode",
+    description: "Experienced players help newcomers learn",
+    rules: ["Mentors guide learners", "Collaborative answers", "Knowledge sharing rewarded"],
+    maxPlayers: 6,
+    timeLimit: 900,
+    objectives: ["Teach others", "Learn from mentors", "Build knowledge together"]
+  },
+  {
+    id: "collaboration",
+    name: "Team Challenge",
+    description: "Work together to solve complex problems",
+    rules: ["Team-based questions", "Shared knowledge", "All must contribute"],
+    maxPlayers: 4,
+    timeLimit: 1200,
+    objectives: ["Share knowledge", "Help teammates", "Solve together"]
+  },
+  {
+    id: "time-attack",
+    name: "Speed Learning",
+    description: "Race against time to answer questions",
+    rules: ["Fast answers required", "Time bonuses", "Quick thinking rewarded"],
+    maxPlayers: 6,
+    timeLimit: 300,
+    objectives: ["Answer quickly", "Think fast", "Beat the clock"]
+  }
+]
+
+// Enhanced Quiz questions with educational features
 const QUIZ_QUESTIONS: Question[] = [
   {
     id: 1,
-    question: "What is the capital of France?",
+    question: "What is the capital of France, and why is it called the 'City of Light'?",
     options: ["London", "Berlin", "Paris", "Madrid"],
     correctAnswer: 2,
     topic: "Geography",
+    difficulty: "medium",
+    hints: ["It's known for its cultural landmarks", "Home to the Eiffel Tower"],
+    explanation: "Paris is the capital of France and earned the nickname 'City of Light' due to its role as a center of education and ideas during the Age of Enlightenment, and its early adoption of street lighting.",
+    collaborative: false,
+    timeLimit: 30,
+    points: 10
   },
   {
     id: 2,
-    question: "What is 15 x 8?",
-    options: ["110", "120", "130", "140"],
+    question: "If a rectangle has length 15 units and width 8 units, what's its area?",
+    options: ["110 square units", "120 square units", "130 square units", "140 square units"],
     correctAnswer: 1,
     topic: "Math",
+    difficulty: "easy",
+    hints: ["Area = length × width", "Think: 10×8 = 80, 5×8 = 40, 80+40 = ?"],
+    explanation: "Area of a rectangle = length × width = 15 × 8 = 120 square units. This is a fundamental geometry concept.",
+    collaborative: false,
+    timeLimit: 20,
+    points: 5
   },
   {
     id: 3,
@@ -336,11 +413,24 @@ function EjectionOverlay({
               : "They couldn't keep up with the class."}
           </p>
           <p className="text-sm text-destructive font-mono">3 STRIKES - YOU'RE OUT!</p>
+          
+          {/* Educational feedback */}
+          <div className="mt-4 p-4 bg-muted/50 rounded-lg border border-border">
+            <p className="text-sm font-medium mb-2">💡 Learning Opportunity:</p>
+            <p className="text-xs text-muted-foreground">
+              Don't worry! This is a chance to review the concepts. You can still learn from watching others and join the next round.
+            </p>
+          </div>
         </div>
 
-        <Button onClick={onDismiss} size="lg" className="mt-4">
-          Continue Game
-        </Button>
+        <div className="flex gap-2 mt-4">
+          <Button onClick={onDismiss} size="lg" variant="outline" className="flex-1">
+            Watch & Learn
+          </Button>
+          <Button onClick={onDismiss} size="lg" className="flex-1">
+            Continue Game
+          </Button>
+        </div>
       </div>
     </div>
   )
@@ -426,6 +516,12 @@ export function ClassroomGame() {
       status: "alive",
       score: 0,
       strikes: 0,
+      level: 5,
+      badges: ["Mentor", "Expert"],
+      streak: 0,
+      collaborationScore: 95,
+      isHelping: false,
+      helpedBy: []
     },
     {
       id: "student-1",
@@ -436,6 +532,12 @@ export function ClassroomGame() {
       status: "alive",
       score: 0,
       strikes: 0,
+      level: 2,
+      badges: ["Quick Learner"],
+      streak: 3,
+      collaborationScore: 78,
+      isHelping: false,
+      helpedBy: ["teacher"]
     },
     {
       id: "student-2",
@@ -446,6 +548,12 @@ export function ClassroomGame() {
       status: "alive",
       score: 0,
       strikes: 0,
+      level: 1,
+      badges: [],
+      streak: 1,
+      collaborationScore: 65,
+      isHelping: false,
+      helpedBy: []
     },
   ])
 
@@ -661,61 +769,107 @@ export function ClassroomGame() {
       </Canvas>
 
       {/* Game UI Overlay */}
-      <div className="absolute top-4 left-4 right-4 flex justify-between items-start pointer-events-none">
-        {/* Question counter */}
-        <div className="bg-card/90 backdrop-blur border border-border rounded-lg p-3 pointer-events-auto">
-          <div className="text-xs text-muted-foreground mb-1">Question</div>
-          <div className="text-2xl font-bold text-foreground">
-            {currentQuestionIndex + 1}
-            <span className="text-muted-foreground text-lg">/10</span>
-          </div>
-        </div>
-
-        {/* Timer */}
-        {gameState === "answering" && (
-          <div className="bg-card/90 backdrop-blur border border-border rounded-lg p-3">
-            <div className="text-xs text-muted-foreground mb-1 text-center">Time</div>
-            <div
-              className={cn(
-                "text-3xl font-mono font-bold text-center",
-                timeLeft <= 5 ? "text-destructive animate-pulse" : "text-primary"
-              )}
-            >
-              {timeLeft}
+      <div className="absolute top-4 left-4 right-4 pointer-events-none">
+        <div className="grid grid-cols-12 gap-3 items-start">
+          {/* Left HUD (stable stack) */}
+          <div className="col-span-12 sm:col-span-5 lg:col-span-3 flex flex-col gap-3 pointer-events-auto">
+            {/* Question counter */}
+            <div className="bg-card/90 backdrop-blur border border-border rounded-lg p-3">
+              <div className="text-xs text-muted-foreground mb-1">Question</div>
+              <div className="text-2xl font-bold text-foreground">
+                {currentQuestionIndex + 1}
+                <span className="text-muted-foreground text-lg">/10</span>
+              </div>
             </div>
-          </div>
-        )}
 
-        {/* Players status */}
-        <div className="bg-card/90 backdrop-blur border border-border rounded-lg p-3 pointer-events-auto">
-          <div className="text-xs text-muted-foreground mb-2">Players</div>
-          <div className="space-y-2">
-            {players
-              .filter((p) => p.role === "student")
-              .map((player) => (
+            {/* Timer */}
+            {gameState === "answering" && (
+              <div className="bg-card/90 backdrop-blur border border-border rounded-lg p-3">
+                <div className="text-xs text-muted-foreground mb-1 text-center">Time</div>
                 <div
-                  key={player.id}
                   className={cn(
-                    "flex items-center gap-2 text-sm",
-                    player.status === "ejected" && "opacity-40 line-through"
+                    "text-3xl font-mono font-bold text-center",
+                    timeLeft <= 5 ? "text-destructive animate-pulse" : "text-primary"
                   )}
                 >
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: player.color }} />
-                  <span className="font-medium">{player.name}</span>
-                  <span className="text-muted-foreground ml-auto">{player.score}</span>
-                  <div className="flex gap-0.5">
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className={cn(
-                          "w-2 h-2 rounded-full",
-                          i < player.strikes ? "bg-destructive" : "bg-muted"
-                        )}
-                      />
-                    ))}
-                  </div>
+                  {timeLeft}
                 </div>
-              ))}
+              </div>
+            )}
+
+            {/* Players status */}
+            <div className="bg-card/90 backdrop-blur border border-border rounded-lg p-3">
+              <div className="text-xs text-muted-foreground mb-2">Players</div>
+              <div className="space-y-2">
+                {players
+                  .filter((p) => p.role === "student")
+                  .map((player) => (
+                    <div
+                      key={player.id}
+                      className={cn(
+                        "flex items-center gap-2 text-sm",
+                        player.status === "ejected" && "opacity-40 line-through"
+                      )}
+                    >
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: player.color }} />
+                      <span className="font-medium">{player.name}</span>
+                      <span className="text-muted-foreground ml-auto tabular-nums">{player.score}</span>
+                      <div className="flex gap-0.5">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                          <div
+                            key={i}
+                            className={cn(
+                              "w-2 h-2 rounded-full",
+                              i < player.strikes ? "bg-destructive" : "bg-muted"
+                            )}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Right HUD (learning tools) */}
+          <div className="hidden lg:flex lg:col-span-4 lg:col-start-9 flex-col gap-3 pointer-events-auto">
+            {gameState === "answering" && (
+              <>
+                <div className="bg-card/90 backdrop-blur border border-border rounded-lg p-3 max-h-64 overflow-y-auto">
+                  <CollaborativeLearning
+                    players={players}
+                    currentQuestion={currentQuestion}
+                    onContribution={(type, content) => {
+                      console.log(`Collaboration: ${type} - ${content}`)
+                    }}
+                    onHelpRequest={(playerId) => {
+                      console.log(`Help requested from: ${playerId}`)
+                    }}
+                  />
+                </div>
+
+                <div className="bg-card/90 backdrop-blur border border-border rounded-lg p-3 max-h-48 overflow-y-auto">
+                  <AIAssistance
+                    currentQuestion={currentQuestion}
+                    playerProgress={{ level: 2, correct: 3, total: 5 }}
+                    gameState={gameState}
+                    onAIHelp={(type, content) => {
+                      console.log(`AI Help: ${type} - ${content}`)
+                    }}
+                  />
+                </div>
+
+                <div className="bg-card/90 backdrop-blur border border-border rounded-lg p-3 max-h-64 overflow-y-auto">
+                  <GamificationSystem
+                    player={players.find((p) => p.id === "student-1")}
+                    gameStats={{ correct: 3, total: 5, streak: 2 }}
+                    onAchievementUnlock={(achievement) => {
+                      console.log(`Achievement unlocked: ${achievement.name}`)
+                    }}
+                  />
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
