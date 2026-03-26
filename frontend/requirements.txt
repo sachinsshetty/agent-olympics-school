@@ -42,7 +42,7 @@ python-dotenv==1.2.1
 python-multipart==0.0.21
 pytz==2025.2
 PyYAML==6.0.3
-requests==2.32.5
+requests==2.33.0
 rich==14.2.0
 safehttpx==0.1.7
 semantic-version==2.10.0
